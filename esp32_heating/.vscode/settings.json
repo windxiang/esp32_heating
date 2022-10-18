@@ -1,0 +1,22 @@
+{
+    "idf.adapterTargetName": "esp32",
+    "files.associations": {
+        "*.cpp": "cpp",
+        "ctime": "cpp",
+        "iostream": "cpp",
+        "array": "cpp",
+        "initializer_list": "cpp",
+        "rope": "cpp",
+        "slist": "cpp",
+        "valarray": "cpp",
+        "ostream": "cpp",
+        "algorithm": "cpp",
+        "xmemory": "cpp",
+        "xutility": "cpp",
+        "cmath": "cpp",
+        "exception": "cpp",
+        "xmemory0": "cpp",
+        "xstddef": "cpp"
+    },
+    "idf.portWin": "COM7"
+}

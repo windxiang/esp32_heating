@@ -1,6 +1,8 @@
 #include "heating.h"
 #include "ExternDraw.h"
+#include <math.h>
 
+extern float BoostTime; // 爆发模式持续时间
 /**
  * @brief 获取数值长度
  *
@@ -47,4 +49,36 @@ long map(long x, long in_min, long in_max, long out_min, long out_max)
 uint32_t UTF8_HMiddle(uint32_t x, uint32_t w, uint8_t size, const char* s)
 {
     return x + (w - Get_UTF8_Ascii_Pix_Len(size, s)) / 2;
+}
+
+/**
+ * @brief 温度曲线计算
+ *
+ * @param T
+ * @param P
+ * @return float
+ */
+float CalculateTemp(float T, float P[])
+{
+    float Temperature = 0;
+    float Time1 = P[1] / P[0];
+    float Time2 = fabsf(P[4] - P[1]) / P[3];
+    float Time3 = P[4] / P[6];
+    if (T <= 0) {
+        Temperature = 0;
+    } else if (T <= Time1) {
+        Temperature = P[0] * T;
+    } else if (T <= (Time1 + P[2])) {
+        Temperature = P[1];
+    } else if (T <= (Time1 + P[2] + Time2)) {
+        Temperature = P[1] + P[3] * (T - (Time1 + P[2])) * (P[4] > P[1] ? 1 : -1);
+    } else if (T <= (Time1 + P[2] + Time2 + P[5])) {
+        Temperature = P[4];
+    } else if (T <= (Time1 + P[2] + Time2 + P[5] + Time3)) {
+        Temperature = P[4] - P[6] * (T - (Time1 + P[2] + Time2 + P[5]));
+    } else {
+        Temperature = 0;
+    }
+    BoostTime = Time1 + P[2] + Time2 + P[5] + Time3;
+    return Temperature;
 }

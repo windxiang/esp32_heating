@@ -1,77 +1,57 @@
 #include "heating.h"
 #include "ExternDraw.h"
+#include "bitmap.h"
 
-static uint8_t curRenderMenuLevelID = 0; // 当前显示的菜单ID
-static uint8_t LastMenuLevelId = 0; // 之前的菜单索引ID(跳转前的)
-static uint8_t Menu_JumpAndExit = false; // 该标志位适用于快速打开菜单设置，当返回时立刻退出菜单 回到主界面
-uint8_t Menu_JumpAndExit_Level = 255; //当跳转完成后 的 菜单层级 等于“跳转即退出层级”时，“跳转即退出”立马生效
-uint8_t Menu_System_State = 1; // 菜单状态 0=显示主界面  1=当前显示菜单
+// static const char* TAG = "render_task";
 
-/* 复选框选中 10*10 */
-uint8_t CheckBoxSelection[] = { 0xff, 0xc0, 0x80, 0x40, 0x80, 0xc0, 0x81, 0xc0, 0x81, 0xc0, 0x83, 0x40, 0x9b, 0x40, 0x8e, 0x40, 0x86, 0x40, 0xff, 0xc0 };
+struct MenuControlStruct {
+    uint8_t curRenderMenuLevelID; // 当前显示的菜单ID
+    uint8_t LastMenuLevelId; // 之前的菜单索引ID(跳转前的)
+    uint8_t Menu_JumpAndExit; // 该标志位适用于快速打开菜单设置，当返回时立刻退出菜单 回到主界面
+    uint8_t Menu_JumpAndExit_Level; // 当跳转完成后 的 菜单层级 等于“跳转即退出层级”时，“跳转即退出”立马生效
+    uint8_t Menu_System_State; // 菜单状态 0=显示主界面  1=当前显示菜单
+};
+
+static MenuControlStruct MenuControl = {
+    curRenderMenuLevelID : 0,
+    LastMenuLevelId : 0,
+    Menu_JumpAndExit : 0,
+    Menu_JumpAndExit_Level : 255,
+    Menu_System_State : 1,
+};
 
 // 判断是否文本渲染模式
 // 若当前菜单层级没有图标化则使用普通文本菜单的模式进行渲染显示
 // 若屏幕分辨率高度小于32 则强制启用文本菜单模式
-#define ISTEXTRENDER(type) (MenuRenderText == type || MenuListMode || OLED_SCREEN_HEIGHT <= 32)
+#define ISTEXTRENDER(type) (MenuRenderText == type || SystemMenuSaveData.MenuListMode || OLED_SCREEN_HEIGHT <= 32)
 
 #define SCROLLBARWIDTH 3 // 文本菜单模式下 滚动条宽度
 
-static void RunMenuControls(uint8_t lid, uint8_t id);
+static void RunMenuControls(uint8_t menuID, uint8_t subMenuIndex);
 
 // 退出菜单系统
 void Save_Exit_Menu_System(void)
 {
+    printf("退出菜单 保存配置\r\n");
+
     // 过渡离开
     u8g2_SetDrawColor(&u8g2, 0);
     Blur(0, 0, OLED_SCREEN_WIDTH, OLED_SCREEN_HEIGHT, 4, 66 * *SwitchControls[SwitchSpace_SmoothAnimation]);
     u8g2_SetDrawColor(&u8g2, 1);
 
     //保存配置
-    // SYS_Save();
+    settings_write_all();
 
     // Exit_Menu_System();
 }
 
-/*
-    @brief 获取当前菜单的渲染类型
-    @param uint8_t id 菜单层对象id
-    @return 菜单层对象 的索引值
-*/
-int GetRealMenuLevelId(int id)
-{
-    int idx = 0;
-    for (int i = 0; i < sizeMenuLevel; i++) {
-        if (MenuLevel[i].id == id) {
-            idx = i;
-        }
-    }
-    return idx;
-}
-
 /**
- * @brief 根据菜单lid 和 id 来获取当前Menu的索引位置
+ * @brief 跳转到上一层菜单
  *
- * @param lid
- * @param id
- * @return int Menu结构体中的索引
  */
-int GetMenuId(int lid, int id)
-{
-    int idx = 0;
-    for (int i = 0; i < sizeMenu; i++) {
-        if (Menu[i].lid == lid && Menu[i].id == id) {
-            idx = i;
-            break;
-        }
-    }
-    return idx;
-}
-
-//按照标题进行跳转 标题跳转 跳转标题
 void JumpWithTitle(void)
 {
-    RunMenuControls(curRenderMenuLevelID, 0);
+    RunMenuControls(MenuControl.curRenderMenuLevelID, 0);
 }
 
 /**
@@ -109,28 +89,27 @@ static void MenuSmoothAnimation_System()
  */
 static void updateRenderMenuEncoderPosition()
 {
-    if (!Menu_System_State)
+    if (!MenuControl.Menu_System_State)
         return;
 
-    int32_t real_Level_Id = GetRealMenuLevelId(curRenderMenuLevelID);
-    MenuLevelSystem* pMenuLevel = &MenuLevel[real_Level_Id];
+    menuSystem* pMenuRoot = getCurRenderMenu(MenuControl.curRenderMenuLevelID);
 
-    if (ISTEXTRENDER(pMenuLevel->RenderType)) {
+    if (ISTEXTRENDER(pMenuRoot->RenderType)) {
         // 文本渲染
-
         // 设置编码器滚动范围
-        pMenuLevel->min = 0; // 重置选项最小值：从图标模式切换到列表模式会改变该值
+        pMenuRoot->minMenuSize = 0; // 重置选项最小值：从图标模式切换到列表模式会改变该值
 
-        uint8_t MinimumScrolling = min((int)SlideControls[Slide_space_Scroll].max, (int)pMenuLevel->max);
+        uint8_t MinimumScrolling = min((int)SlideControls[Slide_space_Scroll].max, pMenuRoot->maxMenuSize - 1);
         RotarySet((int)SlideControls[Slide_space_Scroll].min, MinimumScrolling + 1, 1, (int)*SlideControls[Slide_space_Scroll].val + (1)); //+(1) 是因为实际上计算会-1 ,这里要补回来
-
     } else {
         // 图标渲染
-        if (Menu[GetMenuId(real_Level_Id, 0)].type) {
-            pMenuLevel->min = 1; //当前处在图标模式 如果目标层菜单的第一项为标题，则给予屏蔽
+        subMenu* pSubMenu = getSubMenu(pMenuRoot, 0);
+        if (Type_MenuName == pSubMenu->type) {
+            // 当前处在图标模式 如果目标层菜单的第一项为标题，则给予屏蔽
+            pMenuRoot->minMenuSize = 1;
         }
 
-        RotarySet(pMenuLevel->min, pMenuLevel->max, 1, pMenuLevel->index);
+        RotarySet(pMenuRoot->minMenuSize, pMenuRoot->maxMenuSize - 1, 1, pMenuRoot->index);
         *SlideControls[Slide_space_Scroll].val = 0;
     }
 }
@@ -142,13 +121,14 @@ static void updateRenderMenuEncoderPosition()
 static void Next_Menu(void)
 {
     // 设置菜单标志位
-    Menu_System_State = 1;
+    MenuControl.Menu_System_State = 1;
 
     // 设置编码器
     updateRenderMenuEncoderPosition();
 
+    // 转场动画
     if (*SwitchControls[SwitchSpace_SmoothAnimation]) {
-        if (LastMenuLevelId != curRenderMenuLevelID) {
+        if (MenuControl.LastMenuLevelId != MenuControl.curRenderMenuLevelID) {
             u8g2_SetDrawColor(&u8g2, 0);
             Blur(0, 0, OLED_SCREEN_WIDTH, OLED_SCREEN_HEIGHT, 4, 20 * *SwitchControls[SwitchSpace_SmoothAnimation]);
             u8g2_SetDrawColor(&u8g2, 1);
@@ -163,89 +143,105 @@ static void Next_Menu(void)
 /**
  * @brief 跳转到新菜单
  *
- * @param lid 跳转前的MenuLevel ID
- * @param id 跳转前的菜单ID
+ * @param menuID 跳转前的菜单ID
+ * @param subMenuIndex 跳转前的子菜单
  */
-static void RunMenuControls(uint8_t lid, uint8_t id)
+static void RunMenuControls(uint8_t menuID, uint8_t subMenuIndex)
 {
-    printf("运行菜单控件 %d %d\n", lid, id);
+    // 得到当前正在显示的菜单信息
+    menuSystem* pMenuRoot = getCurRenderMenu(MenuControl.curRenderMenuLevelID);
+    subMenu* pSubMenu = getSubMenu(pMenuRoot, subMenuIndex);
 
-    // 根据lid 和 id 找到当前Menu中的Index
-    int Id = GetMenuId(lid, id);
-
-    switch (Menu[Id].type) {
-    case Type_GotoMenu: // 跳转到菜单
+    switch (pSubMenu->type) {
+    case Type_ReturnMenu: // 返回上一级菜单
     case Type_MenuName: // 菜单名
-        LastMenuLevelId = curRenderMenuLevelID; // 决定是否播放转场动画
-        curRenderMenuLevelID = Menu[Id].ParamA; // 赋值新菜单ID
-        printf("当前Level ID=%d\r\n", curRenderMenuLevelID);
+    case Type_GotoMenu: // 跳转到菜单
+    {
+        MenuControl.LastMenuLevelId = MenuControl.curRenderMenuLevelID; // 决定是否播放转场动画
+        MenuControl.curRenderMenuLevelID = pSubMenu->ParamA; // 赋值新菜单ID
 
-        if (ISTEXTRENDER(MenuLevel[curRenderMenuLevelID].RenderType)) {
+        // 得到目标菜单
+        menuSystem* pNextMenuRoot = getCurRenderMenu(MenuControl.curRenderMenuLevelID);
+
+        if (ISTEXTRENDER(pNextMenuRoot->RenderType)) {
             // 使用文本渲染模式
 
             // 如果当前菜单层没有开启了图表化显示则对子菜单选项定向跳转执行配置
-            uint8_t ExcellentLimit = MenuLevel[curRenderMenuLevelID].max + 1 - SCREEN_FONT_ROW; // 是为了从1开始计算
+            uint8_t ExcellentLimit = pNextMenuRoot->maxMenuSize - SCREEN_FONT_ROW; // 是为了从1开始计算
             uint8_t ExcellentMedian = SCREEN_FONT_ROW / 2; // 注意：这里从1开始计数
 
             // 计算最优显示区域
-            if (Menu[Id].ParamB == 0) {
+            if (pSubMenu->ParamB == 0) {
                 // 头只有最差显示区域
-                MenuLevel[curRenderMenuLevelID].index = 0;
+                pNextMenuRoot->index = 0;
                 *SlideControls[Slide_space_Scroll].val = 0;
 
-            } else if (Menu[Id].ParamB > 0 && Menu[Id].ParamB <= MenuLevel[curRenderMenuLevelID].max - ExcellentMedian) {
+            } else if (pSubMenu->ParamB > 0 && pSubMenu->ParamB <= pNextMenuRoot->maxMenuSize - 1 - ExcellentMedian) {
                 // 中部拥有绝佳的显示区域
-                MenuLevel[curRenderMenuLevelID].index = Menu[Id].ParamB - 1;
+                pNextMenuRoot->index = pSubMenu->ParamB - 1;
                 *SlideControls[Slide_space_Scroll].val = 1;
 
             } else {
                 // 靠后位置 以及 最差的尾部
-                MenuLevel[curRenderMenuLevelID].index = ExcellentLimit;
-                *SlideControls[Slide_space_Scroll].val = Menu[Id].ParamB - ExcellentLimit;
+                pNextMenuRoot->index = ExcellentLimit;
+                *SlideControls[Slide_space_Scroll].val = pSubMenu->ParamB - ExcellentLimit;
             }
 
         } else {
             // 使用图标渲染
-            MenuLevel[curRenderMenuLevelID].index = Menu[Id].ParamB; // 打开新菜单后。默认图标位置
+            subMenu* pNextSubMenu = getSubMenu(pNextMenuRoot, 1);
+            if (pNextSubMenu != NULL && Type_CheckBox == pNextSubMenu->type) {
+                // 如果是 Type_CheckBox 控件
+                if ((*SwitchControls[pNextSubMenu->ParamA] + 1) <= (pNextMenuRoot->maxMenuSize - 1)) {
+                    pNextMenuRoot->index = *SwitchControls[pNextSubMenu->ParamA] + 1;
+                } else {
+                    pNextMenuRoot->index = 0;
+                }
+
+            } else {
+                pNextMenuRoot->index = pSubMenu->ParamB; // 打开新菜单后。默认图标位置
+            }
         }
 
         // 按需求跳转完成后执行函数
-        if (Menu[Id].function) {
-            Menu[Id].function();
+        if (pSubMenu->function) {
+            pSubMenu->function();
         }
 
         // 检查“跳转即退出”标志
-        if (Menu_JumpAndExit && curRenderMenuLevelID == Menu_JumpAndExit_Level) {
+        if (MenuControl.Menu_JumpAndExit && MenuControl.curRenderMenuLevelID == MenuControl.Menu_JumpAndExit_Level) {
             Save_Exit_Menu_System();
         }
 
         // 再次确认菜单状态
-        if (Menu_System_State) {
+        if (MenuControl.Menu_System_State) {
             Next_Menu(); // 由于执行函数可能会导致菜单状态被更改，所以这里需要确定菜单状态
         }
-        break;
+
+    } break;
 
     case Type_RunFunction:
         // 运行函数
-        if (Menu[Id].function) {
-            Menu[Id].function();
+        if (pSubMenu->function) {
+            pSubMenu->function();
         }
         updateRenderMenuEncoderPosition();
         break;
 
     case Type_Switch:
         // 开关控件
-        *SwitchControls[Menu[Id].ParamA] = !*SwitchControls[Menu[Id].ParamA];
-        if (Menu[Id].function) {
-            Menu[Id].function();
+        *SwitchControls[pSubMenu->ParamA] = !*SwitchControls[pSubMenu->ParamA];
+        if (pSubMenu->function) {
+            pSubMenu->function();
         }
+        updateRenderMenuEncoderPosition();
         break;
 
     case Type_CheckBox:
-        //单选模式
-        *SwitchControls[Menu[Id].ParamA] = Menu[Id].ParamB;
-        if (Menu[Id].function) {
-            Menu[Id].function();
+        // 单选模式
+        *SwitchControls[pSubMenu->ParamA] = pSubMenu->ParamB;
+        if (pSubMenu->function) {
+            pSubMenu->function();
         }
         break;
 
@@ -253,7 +249,7 @@ static void RunMenuControls(uint8_t lid, uint8_t id)
         // 滑动条
 
         // 设置编码器
-        RotarySet(SlideControls[Menu[Id].ParamA].min, SlideControls[Menu[Id].ParamA].max, SlideControls[Menu[Id].ParamA].step, *SlideControls[Menu[Id].ParamA].val);
+        RotarySet(SlideControls[pSubMenu->ParamA].min, SlideControls[pSubMenu->ParamA].max, SlideControls[pSubMenu->ParamA].step, *SlideControls[pSubMenu->ParamA].val);
 
         // 背景变淡
         u8g2_SetDrawColor(&u8g2, 0);
@@ -267,26 +263,26 @@ static void RunMenuControls(uint8_t lid, uint8_t id)
             u8g2_SetDrawColor(&u8g2, 1);
             u8g2_DrawRFrame(&u8g2, OLED_SCREEN_WIDTH / 8 - 3, (OLED_SCREEN_HEIGHT - 24) / 2 - 4, 3 * OLED_SCREEN_WIDTH / 4 + 4, 24 + 6, 2);
 
-            *SlideControls[Menu[Id].ParamA].val = GetRotaryPositon();
+            *SlideControls[pSubMenu->ParamA].val = GetRotaryPositon();
 
             // 绘制数字
-            u8g2_DrawUTF8(&u8g2, OLED_SCREEN_WIDTH / 8, (OLED_SCREEN_HEIGHT - 24) / 2 + 1, Menu[Id].name);
+            u8g2_DrawUTF8(&u8g2, OLED_SCREEN_WIDTH / 8, (OLED_SCREEN_HEIGHT - 24) / 2 + 1, pSubMenu->name.c_str());
 
             // 绘制滑动条
-            Draw_Num_Bar(*SlideControls[Menu[Id].ParamA].val, SlideControls[Menu[Id].ParamA].min, SlideControls[Menu[Id].ParamA].max, OLED_SCREEN_WIDTH / 8, (OLED_SCREEN_HEIGHT - 24) / 2 + CNSize + 3, 3 * OLED_SCREEN_WIDTH / 4, 7, 1);
+            Draw_Num_Bar(*SlideControls[pSubMenu->ParamA].val, SlideControls[pSubMenu->ParamA].min, SlideControls[pSubMenu->ParamA].max, OLED_SCREEN_WIDTH / 8, (OLED_SCREEN_HEIGHT - 24) / 2 + CNSize + 3, 3 * OLED_SCREEN_WIDTH / 4, 7, 1);
 
             Display();
 
             //当前滑动条为屏幕亮度调节 需要特殊设置对屏幕亮度进行实时预览
-            if (Menu[Id].function) {
-                Menu[Id].function();
+            if (pSubMenu->function) {
+                pSubMenu->function();
             }
 
             delay(10);
         }
 
-        if (Menu[Id].function) {
-            Menu[Id].function();
+        if (pSubMenu->function) {
+            pSubMenu->function();
         }
         updateRenderMenuEncoderPosition();
         break;
@@ -303,7 +299,7 @@ static void RunMenuControls(uint8_t lid, uint8_t id)
  */
 static void RenderMenu(void)
 {
-    if (!Menu_System_State)
+    if (!MenuControl.Menu_System_State)
         return;
 
     // 清空BUf
@@ -314,47 +310,45 @@ static void RenderMenu(void)
         MenuSmoothAnimation_System();
     }
 
-    SlideBar* pSlideSpace = &SlideControls[Slide_space_Scroll];
+    const SlideBar* pSlideSpace = &SlideControls[Slide_space_Scroll];
 
     // 分别获取 菜单层、菜单项 索引值
-    int32_t real_Level_Id = GetRealMenuLevelId(curRenderMenuLevelID);
+    menuSystem* pMenuRoot = getCurRenderMenu(MenuControl.curRenderMenuLevelID);
 
-    if (ISTEXTRENDER(MenuLevel[real_Level_Id].RenderType)) {
+    if (ISTEXTRENDER(pMenuRoot->RenderType)) {
         // 文本渲染模式
-
-        int Pos_Id = GetMenuId(MenuLevel[real_Level_Id].id, MenuLevel[real_Level_Id].index + (int)*pSlideSpace->val); // 得到当前显示位置
 
         // 显示菜单项目名::这里有两行文字是在屏幕外 用于动过渡动画  所以-1~5共循环6次
         for (int i = -1; i < SCREEN_PAGE_NUM / 2 + 1; i++) {
-            if (MenuLevel[real_Level_Id].index + i >= 0 && MenuLevel[real_Level_Id].index + i <= MenuLevel[real_Level_Id].max) {
+            if (pMenuRoot->index + i >= 0 && pMenuRoot->index + i <= (pMenuRoot->maxMenuSize - 1)) {
                 // 获得当前绘制的菜单内容
-                MenuSystem* pItemMenu = &Menu[GetMenuId(real_Level_Id, MenuLevel[real_Level_Id].index + i)];
+                subMenu* pSubMenu = getSubMenu(pMenuRoot, pMenuRoot->index + i);
 
                 // 绘制目录树 最左边的字符 + 或 -
-                if (pItemMenu->type != Type_MenuName) {
-                    u8g2_DrawUTF8(&u8g2, 0, (1 - menuSmoothAnimation[3].result * (i != -1)) * ((i + menuSmoothAnimation[0].result) * 16 + 1), pItemMenu->type == Type_GotoMenu ? "+" : "-");
+                if (pSubMenu->type != Type_MenuName) {
+                    u8g2_DrawUTF8(&u8g2, 0, (1 - menuSmoothAnimation[3].result * (i != -1)) * ((i + menuSmoothAnimation[0].result) * 16 + 1), pSubMenu->type == Type_GotoMenu ? "+" : "-");
                 }
 
                 // 绘制目录名
-                u8g2_DrawUTF8(&u8g2, 7 * (pItemMenu->type != Type_MenuName), (1 - menuSmoothAnimation[3].result * (i != -1)) * ((i + menuSmoothAnimation[0].result) * 16 + 1) + 1, pItemMenu->name);
+                u8g2_DrawUTF8(&u8g2, 7 * (pSubMenu->type != Type_MenuName), (1 - menuSmoothAnimation[3].result * (i != -1)) * ((i + menuSmoothAnimation[0].result) * 16 + 1) + 1, pSubMenu->name.c_str());
 
                 // 对菜单控件分类渲染
-                switch (pItemMenu->type) {
+                switch (pSubMenu->type) {
                 case Type_Switch:
                     // 开关控件
-                    u8g2_DrawUTF8(&u8g2, OLED_SCREEN_WIDTH - 32 - 1, (i + menuSmoothAnimation[0].result) * 16 + 2, *SwitchControls[pItemMenu->ParamA] ? (char*)"开启" : (char*)"关闭");
+                    u8g2_DrawUTF8(&u8g2, OLED_SCREEN_WIDTH - 32 - 1, (i + menuSmoothAnimation[0].result) * 16 + 2, *SwitchControls[pSubMenu->ParamA] ? "开启" : "关闭");
                     break;
 
                 case Type_Slider:
                     // 弹出滑动条
                     char buffer[20];
-                    sprintf(buffer, "%.2f", *SlideControls[pItemMenu->ParamA].val);
+                    sprintf(buffer, "%.2f", *SlideControls[pSubMenu->ParamA].val);
                     u8g2_DrawUTF8(&u8g2, OLED_SCREEN_WIDTH - 9 - u8g2_GetUTF8Width(&u8g2, buffer), (int)((i + menuSmoothAnimation[0].result) * 16) + 1, buffer);
                     break;
 
                 case Type_CheckBox:
                     // 单选框
-                    if ((*SwitchControls[pItemMenu->ParamA] == pItemMenu->ParamB)) {
+                    if ((*SwitchControls[pSubMenu->ParamA] == pSubMenu->ParamB)) {
                         Draw_Slow_Bitmap(OLED_SCREEN_WIDTH - 32 - 1 + 15, (i + menuSmoothAnimation[0].result) * 16 + 2, CheckBoxSelection, 10, 10);
                     } else {
                         u8g2_DrawFrame(&u8g2, OLED_SCREEN_WIDTH - 32 - 1 + 15, (i + menuSmoothAnimation[0].result) * 16 + 2, 10, 10);
@@ -374,73 +368,73 @@ static void RenderMenu(void)
             }
         }
 
-        int32_t iCurMenuItemIndex = MenuLevel[real_Level_Id].index + *pSlideSpace->val; // 得到当前指向第几个菜单 (页数 + 编码器位置)
+        int32_t iCurMenuItemIndex = pMenuRoot->index + *pSlideSpace->val; // 得到当前指向第几个菜单 (页数 + 编码器位置)
 
         // 绘制右边的滚动条
         DrawScrollBar(OLED_SCREEN_WIDTH - SCROLLBARWIDTH, 0, SCROLLBARWIDTH, OLED_SCREEN_HEIGHT - 1,
-            MenuLevel[real_Level_Id].max + 1,
-            map(iCurMenuItemIndex, 0, MenuLevel[real_Level_Id].max + 1, -menuSmoothAnimation[1].result * (OLED_SCREEN_HEIGHT / (MenuLevel[real_Level_Id].max + 1)), OLED_SCREEN_HEIGHT - 1));
+            pMenuRoot->maxMenuSize,
+            map(iCurMenuItemIndex, 0, pMenuRoot->maxMenuSize, -menuSmoothAnimation[1].result * (OLED_SCREEN_HEIGHT / pMenuRoot->maxMenuSize), OLED_SCREEN_HEIGHT - 1));
 
         // 显示右下角页码角标
-        DrawPageFootnotes(iCurMenuItemIndex + 1, MenuLevel[real_Level_Id].max + 1);
+        DrawPageFootnotes(iCurMenuItemIndex + 1, pMenuRoot->maxMenuSize);
 
         // 选中反色高亮被选项
+        subMenu* pSubMenu = getSubMenu(pMenuRoot, iCurMenuItemIndex); // 得到当前显示的菜单
         u8g2_SetDrawColor(&u8g2, 2);
-        u8g2_DrawRBox(&u8g2, 0, ((int)*pSlideSpace->val - menuSmoothAnimation[1].result) * 16, *SwitchControls[SwitchSpace_OptionStripFixedLength] ? 123 : (u8g2_GetUTF8Width(&u8g2, Menu[Pos_Id].name) - menuSmoothAnimation[2].result + 12 * (Menu[Pos_Id].type != Type_MenuName) + 1), CNSize + 2, 0);
+        u8g2_DrawRBox(&u8g2, 0, ((int)*pSlideSpace->val - menuSmoothAnimation[1].result) * 16, *SwitchControls[SwitchSpace_OptionWidth] ? 123 : (u8g2_GetUTF8Width(&u8g2, pSubMenu->name.c_str()) - menuSmoothAnimation[2].result + 12 * (pSubMenu->type != Type_MenuName) + 1), CNSize + 2, 0);
         u8g2_SetDrawColor(&u8g2, 1);
 
         // 刷新编码器位置
         *pSlideSpace->val = GetRotaryPositon() - 1.0f;
         if (*pSlideSpace->val >= pSlideSpace->max) {
             // 显示下一页
-            MenuLevel[real_Level_Id].index++; // 页数+1
+            pMenuRoot->index++; // 页数+1
             *pSlideSpace->val = pSlideSpace->max - 1.0f;
             RotarySetPositon(pSlideSpace->max);
 
         } else if (*pSlideSpace->val <= -1.0f) {
             // 显示上一页
-            MenuLevel[real_Level_Id].index--; // 页数-1
+            pMenuRoot->index--; // 页数-1
             *pSlideSpace->val = 0.0f;
-            delay(50);
             RotarySetPositon(1);
         }
 
         // 翻页
-        MenuLevel[real_Level_Id].index = constrain(MenuLevel[real_Level_Id].index, MenuLevel[real_Level_Id].min, (MenuLevel[real_Level_Id].max > (uint8_t)(pSlideSpace->max - 1.0f)) ? (MenuLevel[real_Level_Id].max - ((uint8_t)pSlideSpace->max - 1.0f)) : 0);
+        pMenuRoot->index = constrain(pMenuRoot->index, pMenuRoot->minMenuSize, ((pMenuRoot->maxMenuSize - 1) > (uint8_t)(pSlideSpace->max - 1.0f)) ? ((pMenuRoot->maxMenuSize - 1) - ((uint8_t)pSlideSpace->max - 1.0f)) : 0);
 
-        // 更新过渡动画
-        // real_Level_Id = GetRealMenuLevelId(curRenderMenuLevelID);
-        Pos_Id = GetMenuId(MenuLevel[real_Level_Id].id, MenuLevel[real_Level_Id].index + (int)*pSlideSpace->val);
+        // 得到新的菜单
+        subMenu* pNextItemMenu = getSubMenu(pMenuRoot, pMenuRoot->index + *pSlideSpace->val);
 
         // 计算滑动动画
-        menuSmoothAnimation[0].val = MenuLevel[real_Level_Id].index;
-        menuSmoothAnimation[1].val = MenuLevel[real_Level_Id].index + (int)*pSlideSpace->val;
-        menuSmoothAnimation[2].val = u8g2_GetUTF8Width(&u8g2, Menu[Pos_Id].name);
+        menuSmoothAnimation[0].val = pMenuRoot->index;
+        menuSmoothAnimation[1].val = pMenuRoot->index + (int)*pSlideSpace->val;
+        menuSmoothAnimation[2].val = u8g2_GetUTF8Width(&u8g2, pNextItemMenu->name.c_str());
 
     } else {
         // 图标渲染模式
 
-        int id = GetMenuId(MenuLevel[real_Level_Id].id, MenuLevel[real_Level_Id].index);
-        int Pos_Id;
+        // 居中显示菜单名
+        subMenu* pSubMenu = getSubMenu(pMenuRoot, pMenuRoot->index);
+        if (NULL != pSubMenu) {
+            u8g2_DrawUTF8(&u8g2, UTF8_HMiddle(0, OLED_SCREEN_WIDTH, 1, pSubMenu->name.c_str()), 50 + 1, pSubMenu->name.c_str());
+        }
 
-        // 居中显示项目名
-        u8g2_DrawUTF8(&u8g2, UTF8_HMiddle(0, 128, 1, Menu[id].name), 50 + 1, Menu[id].name);
-
+        // 显示两边 和 当前的图标
         for (int8_t i = 0; i < 5; i++) {
-            Pos_Id = GetMenuId(MenuLevel[real_Level_Id].id, MenuLevel[real_Level_Id].index + i - 2);
-
-            if (MenuLevel[real_Level_Id].index - 2 + i >= 0 && MenuLevel[real_Level_Id].index - 2 + i <= MenuLevel[real_Level_Id].max) {
-                // 绘制菜单项目图标
-                if (Menu[id].type != Type_MenuName) {
-                    if (Menu[Pos_Id].type != Type_MenuName) {
-                        Draw_APP((1 - menuSmoothAnimation[3].result * (i != -1)) * (-69 + i * 56 + menuSmoothAnimation[0].result * 56), 3, Menu[Pos_Id].icon);
-                    }
+            int8_t offset = pMenuRoot->index + i - 2;
+            if (offset >= 0 && offset <= (pMenuRoot->maxMenuSize - 1)) {
+                subMenu* pSubMenu = getSubMenu(pMenuRoot, offset);
+                if (pSubMenu && pSubMenu->type != Type_MenuName) {
+                    Draw_APP((1 - menuSmoothAnimation[3].result * (i != -1)) * (-69 + i * 56 + menuSmoothAnimation[0].result * 56), 3, pSubMenu->icon); // 绘制菜单项目图标
                 }
             }
         }
 
-        MenuLevel[real_Level_Id].index = GetRotaryPositon();
-        menuSmoothAnimation[0].val = MenuLevel[real_Level_Id].index;
+        // 更新位置
+        pMenuRoot->index = (int8_t)GetRotaryPositon();
+
+        // 更新动画
+        menuSmoothAnimation[0].val = pMenuRoot->index;
     }
 
     // 等待编码器按钮按下
@@ -449,12 +443,12 @@ static void RenderMenu(void)
     case BUTTON_CLICK:
     case BUTTON_DOUBLECLICK:
         // 单击 双击 执行项目
-        RunMenuControls(MenuLevel[real_Level_Id].id, MenuLevel[real_Level_Id].index + *pSlideSpace->val);
+        RunMenuControls(pMenuRoot->menuID, pMenuRoot->index + *pSlideSpace->val);
         break;
 
     case BUTTON_LONGCLICK:
         // 长按 返回上一个菜单
-        RunMenuControls(MenuLevel[real_Level_Id].id, 0);
+        RunMenuControls(pMenuRoot->menuID, 0);
         break;
 
     default:
@@ -466,8 +460,11 @@ static void RenderMenu(void)
 
 void render_task(void* arg)
 {
+    initMenuSystem();
+
     while (1) {
         RenderMenu();
-        u8g2_SendBuffer(&u8g2);
+        // u8g2_SendBuffer(&u8g2);
+        // vTaskDelay(1);
     }
 }

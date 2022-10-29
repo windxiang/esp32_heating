@@ -22,6 +22,12 @@
 // 事件
 #include "event.h"
 
+// shell
+#include "shell.h"
+
+// nvs
+#include "nvs.h"
+
 #ifndef constrain
 #define constrain(amt, low, high) ((amt) <= (low) ? (low) : ((amt) >= (high) ? (high) : (amt)))
 #endif // constrain
@@ -47,5 +53,5 @@
 #define CNSize 12
 
 //温度限制
-#define TipMaxTemp 300 // 最大温度值
-#define TipMinTemp 0 // 最小温度值
+#define HeatMaxTemp 300 // 最大温度值
+#define HeatMinTemp 0 // 最小温度值

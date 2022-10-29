@@ -1,27 +1,27 @@
 #include "heating.h"
 #include "OneButton.h"
-
 #include "driver/gpio.h"
 
-static const char* TAG = "rotary";
+// static const char* TAG = "rotary";
 
 typedef struct {
-    int32_t EncoderPosition; // 编码器当前位置 必须在最小最大中间
-    int32_t EncoderMinPosition; // 编码器最小位置
-    int32_t EncoderMaxPosition; // 编码器最大位置
-    int32_t EncoderStepPosition; // 编码器每次步进
+    float EncoderPosition; // 编码器当前位置 必须在最小最大中间
+    float EncoderMinPosition; // 编码器最小位置
+    float EncoderMaxPosition; // 编码器最大位置
+    float EncoderStepPosition; // 编码器每次步进
     bool EncoderLOCKFlag; // 锁定标志位,设置为Ture进行锁定,锁定后无法修改EncoderPosition值
     int a; // 中断使用
     int b; // 中断使用
     int ab; // 中断使用
-    QueueHandle_t queue; // 队列
+    QueueHandle_t buttonQueue; // 按钮队列
+    QueueHandle_t encoderQueue; // 编码器队列
 } _RotaryData;
 
 static _RotaryData RotaryData = {};
 
 static OneButton RotaryButton(PIN_BUTTON, true); // 编码器按键逻辑处理
 
-#define ROTARY_FREQDIV 2 // 编码器分频
+#define ROTARY_FREQDIV 2.0f // 编码器分频
 
 /**
  * @brief 编码器中断
@@ -35,6 +35,8 @@ static void IRAM_ATTR rotary_handler(void* arg)
     if (RotaryData.EncoderLOCKFlag == true)
         return;
 
+    BaseType_t xHigherPriorityTaskWoken = pdTRUE;
+
     // 得到AB相状态
     int a = gpio_get_level(PIN_ROTARY_A);
     int b = gpio_get_level(PIN_ROTARY_B);
@@ -45,10 +47,12 @@ static void IRAM_ATTR rotary_handler(void* arg)
         if (b != RotaryData.b) {
             RotaryData.b = b;
 
-            RotaryData.EncoderPosition = constrain(RotaryData.EncoderPosition + ((a == b) ? RotaryData.EncoderStepPosition : -RotaryData.EncoderStepPosition), RotaryData.EncoderMinPosition, RotaryData.EncoderMaxPosition);
+            uint8_t f = a == b;
+            xQueueSendFromISR(RotaryData.encoderQueue, &f, &xHigherPriorityTaskWoken);
 
             if ((a == b) != RotaryData.ab) {
-                RotaryData.EncoderPosition = constrain(RotaryData.EncoderPosition + ((a == b) ? RotaryData.EncoderStepPosition : -RotaryData.EncoderStepPosition), RotaryData.EncoderMinPosition, RotaryData.EncoderMaxPosition);
+                uint8_t f = a == b;
+                xQueueSendFromISR(RotaryData.encoderQueue, &f, &xHigherPriorityTaskWoken);
             }
             RotaryData.ab = (a == b);
         }
@@ -62,11 +66,11 @@ static void IRAM_ATTR rotary_handler(void* arg)
  */
 static void RotaryButtonClick(void)
 {
-    if (NULL != RotaryData.queue) {
+    if (NULL != RotaryData.buttonQueue) {
         // SetSound(Beep1);
         TimerUpdateEvent();
         ROTARY_BUTTON_TYPE f = BUTTON_CLICK;
-        xQueueSend(RotaryData.queue, &f, 0);
+        xQueueSend(RotaryData.buttonQueue, &f, 0);
     }
 }
 
@@ -77,11 +81,11 @@ static void RotaryButtonClick(void)
  */
 static void RotaryButtonLongClick(void)
 {
-    if (NULL != RotaryData.queue) {
+    if (NULL != RotaryData.buttonQueue) {
         // SetSound(Beep1);
         TimerUpdateEvent();
         ROTARY_BUTTON_TYPE f = BUTTON_LONGCLICK;
-        xQueueSend(RotaryData.queue, &f, 0);
+        xQueueSend(RotaryData.buttonQueue, &f, 0);
     }
 }
 
@@ -92,30 +96,30 @@ static void RotaryButtonLongClick(void)
  */
 static void RotaryButtonDoubleClick(void)
 {
-    if (NULL != RotaryData.queue) {
+    if (NULL != RotaryData.buttonQueue) {
         // SetSound(Beep1);
         TimerUpdateEvent();
         ROTARY_BUTTON_TYPE f = BUTTON_DOUBLECLICK;
-        xQueueSend(RotaryData.queue, &f, 0);
+        xQueueSend(RotaryData.buttonQueue, &f, 0);
     }
 }
 
 /**
  * @brief 设置计数器参数
- * @param {double} c       计数器初始值
- * @param {double} min     计数器最小值
- * @param {double} max     计数器最大值
- * @param {double} step    计数器增量步进
- * @return {*}
+ *
+ * @param min 最小值
+ * @param max 最大值
+ * @param step 步进值
+ * @param position 当前位置
  */
-void RotarySet(int32_t min, int32_t max, int32_t step, int32_t position)
+void RotarySet(float min, float max, float step, float position)
 {
     RotaryData.EncoderMinPosition = min * ROTARY_FREQDIV;
     RotaryData.EncoderMaxPosition = max * ROTARY_FREQDIV;
     RotaryData.EncoderStepPosition = step;
     RotaryData.EncoderPosition = constrain(position * ROTARY_FREQDIV, RotaryData.EncoderMinPosition, RotaryData.EncoderMaxPosition);
 
-    ESP_LOGI(TAG, "设置编码器 -> 最小值=%d 最大值=%d 步进=%d 传入计数=%d 当前计数=%d\r\n", min, max, step, position, RotaryData.EncoderPosition);
+    // ESP_LOGI(TAG, "设置编码器 -> 最小值=%f 最大值=%f 步进=%f 传入计数=%f 当前计数=%f\r\n", min, max, step, position, RotaryData.EncoderPosition);
 }
 
 /**
@@ -123,18 +127,18 @@ void RotarySet(int32_t min, int32_t max, int32_t step, int32_t position)
  *
  * @param position
  */
-void RotarySetPositon(int32_t position)
+void RotarySetPositon(float position)
 {
     RotaryData.EncoderPosition = constrain(position * ROTARY_FREQDIV, RotaryData.EncoderMinPosition, RotaryData.EncoderMaxPosition);
-    ESP_LOGI(TAG, "更新编码器 当前计数=%d\r\n", position);
+    // ESP_LOGI(TAG, "更新编码器 当前计数=%f\r\n", position);
 }
 
 /**
  * @brief 编码器数值
  *
- * @return int32_t
+ * @return float
  */
-int32_t GetRotaryPositon(void)
+float GetRotaryPositon(void)
 {
     return RotaryData.EncoderPosition / ROTARY_FREQDIV;
 }
@@ -156,9 +160,9 @@ void setRotaryLock(bool isLock)
  */
 ROTARY_BUTTON_TYPE getRotaryButton(void)
 {
-    if (NULL != RotaryData.queue) {
+    if (NULL != RotaryData.buttonQueue) {
         ROTARY_BUTTON_TYPE f = BUTTON_NULL;
-        xQueueReceive(RotaryData.queue, &f, 0);
+        xQueueReceive(RotaryData.buttonQueue, &f, 0);
         return f;
     }
     return BUTTON_NULL;
@@ -171,12 +175,13 @@ ROTARY_BUTTON_TYPE getRotaryButton(void)
  */
 void rotary_task(void* arg)
 {
-    RotaryData.queue = xQueueCreate(10, sizeof(ROTARY_BUTTON_TYPE));
+    RotaryData.buttonQueue = xQueueCreate(10, sizeof(ROTARY_BUTTON_TYPE));
+    RotaryData.encoderQueue = xQueueCreate(10, sizeof(uint8_t));
 
-    gpio_install_isr_service(0);
+    gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1);
 
     // 初始化编码器
-    gpio_config_t io_conf;
+    gpio_config_t io_conf = {};
     io_conf.mode = GPIO_MODE_INPUT;
     io_conf.pin_bit_mask = BIT64(PIN_ROTARY_A);
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
@@ -206,13 +211,16 @@ void rotary_task(void* arg)
     RotaryButton.setClickTicks(200 / portTICK_PERIOD_MS);
     RotaryButton.setPressTicks(300 / portTICK_PERIOD_MS);
 
-    RotarySet(0, 100, 1, 1);
+    RotarySet(0.0f, 100.f, 1.f, 1.f);
 
     // 设置中断函数
     gpio_isr_handler_add(PIN_ROTARY_A, rotary_handler, NULL);
 
+    uint8_t f;
     while (1) {
+        if (xQueueReceive(RotaryData.encoderQueue, &f, 10 / portTICK_PERIOD_MS) == pdPASS) {
+            RotaryData.EncoderPosition = constrain(RotaryData.EncoderPosition + (f ? RotaryData.EncoderStepPosition : -RotaryData.EncoderStepPosition), RotaryData.EncoderMinPosition, RotaryData.EncoderMaxPosition);
+        }
         RotaryButton.tick();
-        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }

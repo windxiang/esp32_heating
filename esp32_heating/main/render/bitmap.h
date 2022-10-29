@@ -76,6 +76,7 @@ extern uint8_t c3[];
 extern uint8_t c5[];
 extern uint8_t c6[];
 extern uint8_t c7[];
+extern uint8_t CheckBoxSelection[];
 
 #ifdef __cplusplus
 }

@@ -22,6 +22,14 @@ set(srcs_event
     "event/event.cpp"
 )
 
-idf_component_register(SRCS "app_main.cpp" "${srcs_rotary}" "${srcs_oled}" "${srcs_render}" "${srcs_tools}" "${srcs_event}"
-                    INCLUDE_DIRS "." "rotary" "oled" "render" "tools" "event"
-                    REQUIRES spi_flash u8g2)
+set(srcs_shell
+    "shell/shell_task.cpp"
+) 
+
+set(srcs_nvs
+    "nvs/nvs.cpp"
+)
+
+idf_component_register(SRCS "app_main.cpp" "${srcs_rotary}" "${srcs_oled}" "${srcs_render}" "${srcs_tools}" "${srcs_event}" "${srcs_shell}" "${srcs_nvs}"
+                    INCLUDE_DIRS "." "rotary" "oled" "render" "tools" "event" "shell" "nvs"
+                    REQUIRES spi_flash u8g2 console vfs nvs_flash)

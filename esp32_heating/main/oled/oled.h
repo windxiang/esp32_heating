@@ -29,6 +29,8 @@ extern "C" {
 extern u8g2_t u8g2;
 
 void oled_init(int sda_io_num, int scl_io_num, uint32_t freqHZ, i2c_mode_t mode);
+void Update_OLED_Flip(uint8_t isFlip);
+void Update_OLED_Light_Level(uint8_t light);
 
 uint8_t u8g2_esp32_i2c_byte_cb(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* arg_ptr);
 uint8_t u8g2_esp32_gpio_and_delay_cb(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* arg_ptr);

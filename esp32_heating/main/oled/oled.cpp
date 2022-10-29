@@ -132,3 +132,22 @@ void oled_init(int sda_io_num, int scl_io_num, uint32_t freqHZ, i2c_mode_t mode)
     // u8g2_DrawUTF8(&u8g2, 0, 1, "abc");
     u8g2_SendBuffer(&u8g2);
 }
+
+/**
+ * @brief 反转屏幕
+ *
+ */
+void Update_OLED_Flip(uint8_t isFlip)
+{
+    u8g2_SetFlipMode(&u8g2, isFlip);
+}
+
+/**
+ * @brief 更新屏幕亮度
+ *
+ */
+void Update_OLED_Light_Level(uint8_t light)
+{
+    u8g2_SendF(&u8g2, "c", 0x81); //向SSD1306发送指令：设置内部电阻微调
+    u8g2_SendF(&u8g2, "c", light); //微调范围（0-255）
+}

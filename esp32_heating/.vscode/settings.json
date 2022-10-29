@@ -16,7 +16,17 @@
         "cmath": "cpp",
         "exception": "cpp",
         "xmemory0": "cpp",
-        "xstddef": "cpp"
+        "xstddef": "cpp",
+        "type_traits": "cpp",
+        "vector": "cpp",
+        "xstring": "cpp",
+        "limits": "cpp",
+        "xiosbase": "c",
+        "random": "cpp",
+        "list": "cpp",
+        "xhash": "cpp",
+        "system_error": "cpp",
+        "xlocale": "cpp"
     },
     "idf.portWin": "COM7"
 }

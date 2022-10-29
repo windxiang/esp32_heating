@@ -31,6 +31,8 @@ uint32_t Get_UTF8_Ascii_Pix_Len(uint8_t size, const char* s);
 
 void DrawPageFootnotes(int curPage, int TotalPage);
 void Draw_APP(int x, int y, uint8_t* bitmap);
+void DrawTempCurve(void);
+void PopWindows(const char* s);
 
 #ifdef __cplusplus
 }

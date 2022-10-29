@@ -12,10 +12,10 @@ typedef enum {
 } ROTARY_BUTTON_TYPE;
 
 void rotary_task(void* arg);
-void RotarySet(int32_t min, int32_t max, int32_t step, int32_t position);
-void RotarySetPositon(int32_t position);
+void RotarySet(float min, float max, float step, float position);
+void RotarySetPositon(float position);
 
-int32_t GetRotaryPositon(void);
+float GetRotaryPositon(void);
 void setRotaryLock(bool isLock);
 ROTARY_BUTTON_TYPE getRotaryButton(void);
 

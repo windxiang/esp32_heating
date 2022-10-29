@@ -7,8 +7,10 @@
 double TipTemperature = 0; // PID输入值 (当前温度)
 double PID_Output = 0; // PID输出值 要输出PWM宽度
 double PID_Setpoint = 0; // PID目标值 (设定温度值)
+
 uint32_t POWER = 0;
 uint8_t PWM_Resolution = 10; // 分辨率
+float BoostTime = 0; // 爆发模式持续时间
 
 void EnterLogo(void)
 {
@@ -94,17 +96,15 @@ void ClearOLEDBuffer(void)
     u8g2_ClearBuffer(&u8g2);
 }
 
-uint8_t DisplayFlashTick = 0;
 void Display(void)
 {
     // PlaySoundLoop();
-    // ShellLoop();
 
     // OLED_ScreenshotPrint();
 
     u8g2_SendBuffer(&u8g2);
 
-    DisplayFlashTick++;
+    vTaskDelay(1);
 }
 
 /**
@@ -122,9 +122,10 @@ void Blur(int sx, int sy, int ex, int ey, int f, int delayMs)
     for (int i = 0; i < f; i++) {
         for (int y = 0; y < ey; y++) {
             for (int x = 0; x < ex; x++) {
-                if (x % 2 == y % 2 && x % 2 == 0 && x >= sx && x <= ex && y >= sy && y <= ey)
+                if (x % 2 == y % 2 && x % 2 == 0 && x >= sx && x <= ex && y >= sy && y <= ey) {
                     u8g2_DrawPixel(&u8g2, x + (i > 0 && i < 3), y + (i > 1));
-                // else u8g2_DrawPixel(&u8g2, x + (i > 0 && i < 3), y + (i > 1), 0);
+                }
+                // else {u8g2_DrawPixel(&u8g2, x + (i > 0 && i < 3), y + (i > 1), 0);}
             }
         }
 
@@ -248,6 +249,7 @@ void Draw_Slow_Bitmap(int x, int y, const unsigned char* bitmap, unsigned char w
         for (xi = 0; xi < w; xi++) {
             if (pgm_read_byte(bitmap + yi * intWidth + xi / 8) & (128 >> (xi & 7))) {
                 u8g2_DrawPixel(&u8g2, x + xi, y + yi);
+
             } else if (color != 2) {
                 u8g2_SetDrawColor(&u8g2, 0);
                 u8g2_DrawPixel(&u8g2, x + xi, y + yi);
@@ -370,31 +372,6 @@ void DrawHighLightText(int x, int y, const char* s)
     }
 }
 
-#if 0
-void Log(MESSAGETYPE type, const char* s)
-{
-    switch (type) {
-    case LOG_INFO:
-        printf("[INFO]");
-        break;
-    case LOG_OK:
-        printf("[OK]");
-        break;
-    case LOG_FAILED:
-        printf("[FAILED]");
-        break;
-    case LOG_WARNING:
-        printf("[WARNING]");
-        break;
-    case LOG_ERROR:
-        printf("[ERROR]");
-        break;
-    }
-    printf("%s\n", s);
-    // Pop_Windows(s);
-}
-#endif
-
 /***
  * @description: 绘制温度状态条
  * @param bool color 颜色
@@ -407,8 +384,8 @@ void DrawStatusBar(bool color)
     //框
     u8g2_DrawFrame(&u8g2, 0, 53, 103, 11);
     //条
-    if (TipTemperature <= TipMaxTemp)
-        u8g2_DrawBox(&u8g2, 0, 53, map(TipTemperature, TipMinTemp, TipMaxTemp, 5, 98), 11);
+    if (TipTemperature <= HeatMaxTemp)
+        u8g2_DrawBox(&u8g2, 0, 53, map(TipTemperature, HeatMinTemp, HeatMaxTemp, 5, 98), 11);
 
     //功率条
     u8g2_DrawFrame(&u8g2, 104, 53, 23, 11);
@@ -422,7 +399,7 @@ void DrawStatusBar(bool color)
     u8g2_SetDrawColor(&u8g2, 2);
 
     //画指示针
-    Draw_Slow_Bitmap(map(PID_Setpoint, TipMinTemp, TipMaxTemp, 5, 98) - 4, 54, PositioningCursor, 8, 8);
+    Draw_Slow_Bitmap(map(PID_Setpoint, HeatMinTemp, HeatMaxTemp, 5, 98) - 4, 54, PositioningCursor, 8, 8);
 
 #if 0
     u8g2_SetCursor(&u8g2, 2, 53);
@@ -448,22 +425,26 @@ void DrawStatusBar(bool color)
  */
 void TextEditor(const char* title, char* text, int32_t textSize)
 {
-    char newText[20] = { 0 };
+    char newText[20] = { 0 }; // 最多20个格子
     strncpy(newText, text, sizeof(newText));
 
-    uint8_t charCounter = 0; //光标指针
+    uint8_t charCounter = 0; // 光标指针
     char editChar = 'A';
 
     bool exitRenameGUI = false;
-    bool editFlag = 0, lastEditFlag = 1; //编辑器状态：0:选择要编辑的字符    1:选择ASCII
+    bool editFlag = 0, // 编辑器状态：0:选择要编辑的字符    1:选择ASCII
+        lastEditFlag = 1;
 
     while (!exitRenameGUI) {
         // 设置编码器
         if (editFlag != lastEditFlag) {
-            if (editFlag == 0)
-                RotarySet(0, 19, 1, charCounter);
-            else
-                RotarySet(0, 255, 1, newText[charCounter]);
+            if (editFlag == 0) {
+                // 选择位置
+                RotarySet(0.f, 19.f, 1.f, (float)charCounter);
+            } else {
+                // 选择ASCII
+                RotarySet(0.f, 255.f, 1.f, (float)newText[charCounter]);
+            }
 
             lastEditFlag = editFlag;
         }
@@ -471,11 +452,13 @@ void TextEditor(const char* title, char* text, int32_t textSize)
         // 获取编码器输入
         switch (editFlag) {
         case 0:
-            charCounter = GetRotaryPositon();
+            // 左右选择位置
+            charCounter = (char)GetRotaryPositon();
             break;
 
         case 1:
-            editChar = GetRotaryPositon();
+            // 选择ASCII
+            editChar = (char)GetRotaryPositon();
             newText[charCounter] = editChar;
             break;
         }
@@ -489,6 +472,7 @@ void TextEditor(const char* title, char* text, int32_t textSize)
         u8g2_DrawUTF8(&u8g2, 0, 1, title);
 
         // 第二行显示编辑文本
+        u8g2_SetFont(&u8g2, u8g2_font_6x12_tf);
         u8g2_DrawUTF8(&u8g2, 0, 12 + 1, newText);
 
         // 显示当前选中的ASCII
@@ -496,10 +480,11 @@ void TextEditor(const char* title, char* text, int32_t textSize)
         u8g2_SetFont(&u8g2, u8g2_font_logisoso26_tf);
 
         // 文本编辑器
-        char str[10] = { 0 };
+        char str[5] = { 0 };
         str[0] = newText[charCounter];
         u8g2_DrawUTF8(&u8g2, 0, 34, str);
 
+        // 文本编辑器 显示十六进制 值
         sprintf(str, "0X%02X", newText[charCounter]);
         u8g2_DrawUTF8(&u8g2, 32, 34, str);
 
@@ -508,17 +493,20 @@ void TextEditor(const char* title, char* text, int32_t textSize)
         // 反色显示光标
         u8g2_SetDrawColor(&u8g2, 2);
         if (editFlag) {
-            // 选择字符时 光标闪烁
+            // 编辑状态下 选择字符时 光标闪烁
             if ((xTaskGetTickCount() / 50) % 2) {
                 u8g2_DrawBox(&u8g2, charCounter * 6, 12, 6, 12);
             }
 
         } else {
+            // 不是编辑状态
             u8g2_DrawBox(&u8g2, charCounter * 6, 12, 6, 12);
         }
 
         // 字符选择区反色高亮
-        u8g2_DrawBox(&u8g2, 0, 32, 32, 32);
+        if (editFlag) {
+            u8g2_DrawBox(&u8g2, 0, 32, 32, 32);
+        }
 
         Display();
 
@@ -542,8 +530,19 @@ void TextEditor(const char* title, char* text, int32_t textSize)
             break;
         }
     }
+
+    u8g2_SetDrawColor(&u8g2, 1);
+    u8g2_SetFont(&u8g2, u8g2_font_wqy12_t_gb2312);
+    Display();
 }
 
+/**
+ * @brief 获得字符串的宽度
+ *
+ * @param size
+ * @param s
+ * @return uint32_t
+ */
 uint32_t Get_UTF8_Ascii_Pix_Len(uint8_t size, const char* s)
 {
     return u8g2_GetUTF8Width(&u8g2, s);
@@ -592,4 +591,92 @@ void Draw_APP(int x, int y, uint8_t* bitmap)
     u8g2_SetDrawColor(&u8g2, 1);
 
     Draw_Slow_Bitmap_Resize(x, y, bitmap + 1, bitmap[0], bitmap[0], 42, 42);
+}
+
+/**
+ * @brief 绘制温度曲线
+ *
+ */
+void DrawTempCurve(void)
+{
+    int y;
+    CalculateTemp(0, HeatingConfig.curConfig.PTemp);
+
+    int countStep = BoostTime / 127 + 1;
+
+    RotarySet(0, 127, 1, 0);
+
+    while (BUTTON_NULL == getRotaryButton()) {
+        // 得到编码器位置
+        float rotaryPositon = GetRotaryPositon();
+
+        ClearOLEDBuffer();
+
+        // 绘制参考文字
+        char buffer[64];
+        sprintf(buffer, "时间 %dm%ds", (int)(rotaryPositon * countStep) / 60, (int)(rotaryPositon * countStep) % 60);
+        DrawHighLightText(128 - u8g2_GetUTF8Width(&u8g2, buffer) - 2, 36, buffer);
+
+        sprintf(buffer, "温度 %.1f", CalculateTemp(rotaryPositon * countStep, HeatingConfig.curConfig.PTemp));
+        DrawHighLightText(128 - u8g2_GetUTF8Width(&u8g2, buffer) - 2, 51, buffer);
+
+        // 绘制曲线
+        u8g2_SetDrawColor(&u8g2, 2);
+        for (int x = 0; x < 128; x++) {
+            y = map(CalculateTemp(x * countStep, HeatingConfig.curConfig.PTemp), 0, (HeatingConfig.curConfig.PTemp[4] > HeatingConfig.curConfig.PTemp[1] ? HeatingConfig.curConfig.PTemp[4] : HeatingConfig.curConfig.PTemp[1]) + 1, 0, 63);
+            u8g2_DrawPixel(&u8g2, x, 63 - y);
+
+            // 画指示针
+            if (x == rotaryPositon)
+                Draw_Slow_Bitmap(x - 4, 63 - y - 4, PositioningCursor, 8, 8);
+        }
+
+        u8g2_SetDrawColor(&u8g2, 1);
+
+        // 绘制底部点点
+        for (int yy = 0; yy < 64; yy += 8) {
+            for (int xx = 0; xx < 128; xx += 8) {
+                u8g2_DrawPixel(&u8g2, xx + 2, yy + 4);
+            }
+        }
+
+        Display();
+    }
+
+    u8g2_SetDrawColor(&u8g2, 1);
+}
+
+/**
+ * @brief 弹窗显示
+ *
+ * @param s
+ */
+void PopWindows(const char* s)
+{
+    int w = Get_UTF8_Ascii_Pix_Len(1, s) + 2;
+    int h = 12;
+    const int x = (OLED_SCREEN_WIDTH - w) / 2;
+    const int y = (OLED_SCREEN_HEIGHT - h) / 2;
+
+    u8g2_SetDrawColor(&u8g2, 0);
+    Blur(0, 0, OLED_SCREEN_WIDTH, OLED_SCREEN_HEIGHT, 3, 66 * *SwitchControls[SwitchSpace_SmoothAnimation]); //<=15FPS以便人眼察觉细节变化
+
+    int ix = 0;
+    for (int i = 1; i <= 10; i++) {
+        //震荡动画
+        if (*SwitchControls[SwitchSpace_SmoothAnimation])
+            ix = (10 * cos((i * 3.14) / 2.0)) / i;
+
+        u8g2_SetDrawColor(&u8g2, 0);
+        Blur(0, 0, OLED_SCREEN_WIDTH, OLED_SCREEN_HEIGHT, 3, 0);
+        u8g2_DrawFrame(&u8g2, x - 1 + ix, y - 3, w + 1, h + 3);
+        u8g2_SetDrawColor(&u8g2, 1);
+        u8g2_DrawRBox(&u8g2, x + ix, y - 2, w, h + 2, 2);
+        u8g2_SetDrawColor(&u8g2, 0);
+        u8g2_DrawUTF8(&u8g2, x + 1 + ix, y, s);
+        u8g2_SetDrawColor(&u8g2, 1);
+
+        Display();
+        delay(20 * *SwitchControls[SwitchSpace_SmoothAnimation]);
+    }
 }

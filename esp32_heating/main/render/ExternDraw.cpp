@@ -399,16 +399,15 @@ void DrawStatusBar(bool color)
     u8g2_SetDrawColor(&u8g2, 2);
 
     //画指示针
-    Draw_Slow_Bitmap(map(PID_Setpoint, HeatMinTemp, HeatMaxTemp, 5, 98) - 4, 54, PositioningCursor, 8, 8);
+    // Draw_Slow_Bitmap(map(PID_Setpoint, HeatMinTemp, HeatMaxTemp, 5, 98) - 4, 54, PositioningCursor, 8, 8);
 
-#if 0
-    u8g2_SetCursor(&u8g2, 2, 53);
-    u8g2_Printf(&u8g2, "%.0f", PID_Setpoint);
+    char buf[128];
+    // sprintf("%.0f", PID_Setpoint);
+    u8g2_DrawUTF8(&u8g2, 2, 53, buf);
 
-    u8g2_SetCursor(&u8g2, 105, 53);
-    //显示输出功率 百分比
-    u8g2_Printf(&u8g2, "%d%%", map(POWER, 0, pow(2, PWM_Resolution) - 1, 0, 100));
-#endif
+    // 显示输出功率 百分比
+    // sprintf("%d%%", map(POWER, 0, pow(2, PWM_Resolution) - 1, 0, 100));
+    u8g2_DrawUTF8(&u8g2, 105, 53, buf);
 
     //显示真实功率
     // u8g2_Printf(&u8g2, "%.0fW", SYS_Voltage * SYS_Current);

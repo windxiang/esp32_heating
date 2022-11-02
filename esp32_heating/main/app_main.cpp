@@ -2,6 +2,13 @@
 #include <stdio.h>
 #include <esp_chip_info.h>
 #include <esp_spi_flash.h>
+#include "PIDv1.h"
+
+double TipTemperature1 = 0; // PID输入值 (当前温度)
+double PID_Output1 = 0; // PID输出值 要输出PWM宽度
+double PID_Setpoint1 = 0; // PID目标值 (设定温度值)
+double aggKp1 = 0.0, aggKi1 = 0.0, aggKd1 = 0.0;
+PID MyPID(&TipTemperature1, &PID_Output1, &PID_Setpoint1, aggKp1, aggKi1, aggKd1, DIRECT);
 
 static const char* TAG = "app_main";
 
@@ -17,10 +24,13 @@ void app_main(void)
     ESP_LOGI(TAG, "%d MB %s SPI FLASH\n", spi_flash_get_chip_size() / (1024 * 1024), (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
     // 初始化OLED
-    oled_init(OLED_I2C_PIN_SDA, OLED_I2C_PIN_SCL, OLED_FREQ, I2C_MODE_MASTER);
+    // oled_init(OLED_I2C_PIN_SDA, OLED_I2C_PIN_SCL, OLED_FREQ, I2C_MODE_MASTER);
 
     // 初始化shell
     shell_init();
+
+    // 初始化PWM
+    pwmInit();
 
     // 初始化系统保存参数
     if (ESP_OK == settings_storage_init()) {
@@ -32,10 +42,10 @@ void app_main(void)
     }
 
     // 初始化编码器 编码器工作线程
-    xTaskCreatePinnedToCore(rotary_task, "rotary", 1024 * 5, NULL, 5, NULL, tskNO_AFFINITY);
+    // xTaskCreatePinnedToCore(rotary_task, "rotary", 1024 * 5, NULL, 5, NULL, tskNO_AFFINITY);
 
-    // 初始化Render
-    xTaskCreatePinnedToCore(render_task, "render", 1024 * 12, NULL, 5, NULL, tskNO_AFFINITY);
+    // 初始化逻辑控制前期
+    // xTaskCreatePinnedToCore(logic_task, "logic", 1024 * 20, NULL, 5, NULL, tskNO_AFFINITY);
 
     // uint32_t pos = 0;
     while (1) {

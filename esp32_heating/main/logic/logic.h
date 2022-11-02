@@ -4,7 +4,10 @@
 extern "C" {
 #endif // __cplusplus
 
-void render_task(void* arg);
+void exitMenu(void);
+void enterMenu(void);
+
+void logic_task(void* arg);
 
 #ifdef __cplusplus
 }

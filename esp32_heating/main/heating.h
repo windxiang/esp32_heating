@@ -13,7 +13,7 @@
 
 // 渲染
 #include "u8g2.h"
-#include "render_task.h"
+#include "render.h"
 #include "menuobj.h"
 
 // 工具
@@ -27,6 +27,12 @@
 
 // nvs
 #include "nvs.h"
+
+// pwm
+#include "pwm.h"
+
+// 逻辑控制
+#include "logic.h"
 
 #ifndef constrain
 #define constrain(amt, low, high) ((amt) <= (low) ? (low) : ((amt) >= (high) ? (high) : (amt)))
@@ -55,3 +61,9 @@
 //温度限制
 #define HeatMaxTemp 300 // 最大温度值
 #define HeatMinTemp 0 // 最小温度值
+
+// PWM 输出GPIO配置
+#define PWM_T12 15
+#define PWM_FAN 12
+#define PWM_HEAT 26
+#define PWM_BEEP 25

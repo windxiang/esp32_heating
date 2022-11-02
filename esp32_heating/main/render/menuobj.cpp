@@ -50,7 +50,7 @@ _HeatingSystem HeatingConfig = {
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void Save_Exit_Menu_System(void);
+void ExitMenuSystem(void);
 void BLE_Restart(void);
 void BLE_Rename(void);
 void SetPasswd(void);
@@ -438,10 +438,10 @@ void delHeatConfig(void)
 static std::vector<menuSystem> menuInfo = {
     // 菜单入口
     { 0, 0, 0, 0, MenuRenderText, {
-                                      { Type_MenuName, "[加热台设置]", NULL, 0, 0, *Save_Exit_Menu_System },
+                                      { Type_MenuName, "[加热台设置]", NULL, 0, 0, *ExitMenuSystem },
                                       { Type_GotoMenu, "温度设置", NULL, 200, 0, NULL },
                                       { Type_GotoMenu, "系统设置", NULL, 100, 0, NULL },
-                                      { Type_RunFunction, "返回", NULL, 0, 0, *Save_Exit_Menu_System },
+                                      { Type_RunFunction, "返回", NULL, 0, 0, *ExitMenuSystem },
                                       { Type_RunFunction, "重启系统", NULL, 0, 0, *(SYSReboot) },
                                   } },
 

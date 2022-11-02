@@ -9,7 +9,6 @@ struct MenuControlStruct {
     uint8_t LastMenuLevelId; // 之前的菜单索引ID(跳转前的)
     uint8_t Menu_JumpAndExit; // 该标志位适用于快速打开菜单设置，当返回时立刻退出菜单 回到主界面
     uint8_t Menu_JumpAndExit_Level; // 当跳转完成后 的 菜单层级 等于“跳转即退出层级”时，“跳转即退出”立马生效
-    uint8_t Menu_System_State; // 菜单状态 0=显示主界面  1=当前显示菜单
 };
 
 static MenuControlStruct MenuControl = {
@@ -17,7 +16,6 @@ static MenuControlStruct MenuControl = {
     LastMenuLevelId : 0,
     Menu_JumpAndExit : 0,
     Menu_JumpAndExit_Level : 255,
-    Menu_System_State : 1,
 };
 
 // 判断是否文本渲染模式
@@ -30,19 +28,20 @@ static MenuControlStruct MenuControl = {
 static void RunMenuControls(uint8_t menuID, uint8_t subMenuIndex);
 
 // 退出菜单系统
-void Save_Exit_Menu_System(void)
+void ExitMenuSystem(void)
 {
-    printf("退出菜单 保存配置\r\n");
-
     // 过渡离开
     u8g2_SetDrawColor(&u8g2, 0);
     Blur(0, 0, OLED_SCREEN_WIDTH, OLED_SCREEN_HEIGHT, 4, 66 * *SwitchControls[SwitchSpace_SmoothAnimation]);
     u8g2_SetDrawColor(&u8g2, 1);
 
-    //保存配置
+    // 保存配置
     settings_write_all();
 
-    // Exit_Menu_System();
+    // 退出菜单
+    exitMenu();
+
+    printf("退出菜单\r\n");
 }
 
 /**
@@ -89,9 +88,6 @@ static void MenuSmoothAnimation_System()
  */
 static void updateRenderMenuEncoderPosition()
 {
-    if (!MenuControl.Menu_System_State)
-        return;
-
     menuSystem* pMenuRoot = getCurRenderMenu(MenuControl.curRenderMenuLevelID);
 
     if (ISTEXTRENDER(pMenuRoot->RenderType)) {
@@ -120,9 +116,6 @@ static void updateRenderMenuEncoderPosition()
 */
 static void Next_Menu(void)
 {
-    // 设置菜单标志位
-    MenuControl.Menu_System_State = 1;
-
     // 设置编码器
     updateRenderMenuEncoderPosition();
 
@@ -210,13 +203,10 @@ static void RunMenuControls(uint8_t menuID, uint8_t subMenuIndex)
 
         // 检查“跳转即退出”标志
         if (MenuControl.Menu_JumpAndExit && MenuControl.curRenderMenuLevelID == MenuControl.Menu_JumpAndExit_Level) {
-            Save_Exit_Menu_System();
+            ExitMenuSystem();
         }
 
-        // 再次确认菜单状态
-        if (MenuControl.Menu_System_State) {
-            Next_Menu(); // 由于执行函数可能会导致菜单状态被更改，所以这里需要确定菜单状态
-        }
+        Next_Menu();
 
     } break;
 
@@ -297,11 +287,8 @@ static void RunMenuControls(uint8_t menuID, uint8_t subMenuIndex)
  * @brief 渲染主菜单
  *
  */
-static void RenderMenu(void)
+void RenderMenu(void)
 {
-    if (!MenuControl.Menu_System_State)
-        return;
-
     // 清空BUf
     ClearOLEDBuffer();
 
@@ -456,15 +443,4 @@ static void RenderMenu(void)
     }
 
     Display();
-}
-
-void render_task(void* arg)
-{
-    initMenuSystem();
-
-    while (1) {
-        RenderMenu();
-        // u8g2_SendBuffer(&u8g2);
-        // vTaskDelay(1);
-    }
 }

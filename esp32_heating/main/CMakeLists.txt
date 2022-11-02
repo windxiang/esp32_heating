@@ -39,6 +39,10 @@ set(srcs_pwm
     "pwm/pwm.cpp"
 )
 
-idf_component_register(SRCS "app_main.cpp" "${srcs_rotary}" "${srcs_oled}" "${srcs_render}" "${srcs_tools}" "${srcs_event}" "${srcs_shell}" "${srcs_nvs}" "${srcs_logic}" "${srcs_pwm}"
-                    INCLUDE_DIRS "." "rotary" "oled" "render" "tools" "event" "shell" "nvs" "logic" "pwm"
+set(srcs_ws28122
+    "ws2812/ws2812.cpp"
+)
+
+idf_component_register(SRCS "app_main.cpp" "${srcs_rotary}" "${srcs_oled}" "${srcs_render}" "${srcs_tools}" "${srcs_event}" "${srcs_shell}" "${srcs_nvs}" "${srcs_logic}" "${srcs_pwm}" "${srcs_ws28122}"
+                    INCLUDE_DIRS "." "rotary" "oled" "render" "tools" "event" "shell" "nvs" "logic" "pwm" "ws2812"
                     REQUIRES spi_flash u8g2 console vfs nvs_flash PIDv1)

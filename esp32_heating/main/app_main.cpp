@@ -29,6 +29,9 @@ void app_main(void)
     // 初始化shell
     shell_init();
 
+    // 初始化WS2812
+    WS2812init();
+
     // 初始化PWM
     pwmInit();
 

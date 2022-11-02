@@ -31,6 +31,9 @@
 // pwm
 #include "pwm.h"
 
+// ws2812 led
+#include "ws2812.h"
+
 // 逻辑控制
 #include "logic.h"
 
@@ -67,3 +70,7 @@
 #define PWM_FAN 12
 #define PWM_HEAT 26
 #define PWM_BEEP 25
+
+// WS2812 RGB
+#define WS2812RGB GPIO_NUM_32
+#define STRIP_LED_NUMBER 1 // WS2812 LED 个数

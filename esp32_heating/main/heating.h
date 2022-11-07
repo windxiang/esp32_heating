@@ -2,9 +2,12 @@
 
 #include <stdbool.h>
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/queue.h>
+#include <freertos/event_groups.h>
+#include <freertos/semphr.h>
+
 #include "esp_log.h"
 
 // 驱动
@@ -13,14 +16,10 @@
 
 // 渲染
 #include "u8g2.h"
-#include "render.h"
 #include "menuobj.h"
 
 // 工具
 #include "mathFun.h"
-
-// 事件
-#include "event.h"
 
 // shell
 #include "shell.h"
@@ -36,6 +35,12 @@
 
 // 逻辑控制
 #include "logic.h"
+
+// max6675
+#include "max6675.h"
+
+// ADC
+#include "adc.h"
 
 #ifndef constrain
 #define constrain(amt, low, high) ((amt) <= (low) ? (low) : ((amt) >= (high) ? (high) : (amt)))
@@ -53,6 +58,32 @@
 #define PIN_ROTARY_A GPIO_NUM_27 // 编码器
 #define PIN_ROTARY_B GPIO_NUM_14 // 编码器
 #define PIN_BUTTON GPIO_NUM_33 // 编码器按键
+#define PIN_KEY1 GPIO_NUM_4 // 按键1
+
+// PWM 输出GPIO配置
+#define PIN_PWM_T12 15
+#define PIN_PWM_FAN 12
+#define PIN_PWM_HEAT 26
+#define PIN_PWM_BEEP 25
+
+// WS2812 RGB
+#define PIN_WS2812RGB GPIO_NUM_32
+#define STRIP_LED_NUMBER 1 // WS2812 LED 个数
+
+// MAX6675 SPI
+#define PIN_MAX6675_SPI_CS GPIO_NUM_5
+#define PIN_MAX6675_SPI_CLK GPIO_NUM_18
+#define PIN_MAX6675_SPI_MISO GPIO_NUM_19
+
+// ADC 采集
+#define PIN_ADC_T12_TEMP 36 // ADC1_CH0 SENSOR_VP
+#define PIN_ADC_T12_CUR 39 // ADC1_CH3 SENSOR_VN
+#define PIN_ADC_T12_NTC 34 // ADC1_CH6 VDET_1
+#define PIN_ADC_VCC 37 // ADC1_CH1 SENSOR_CAPP
+#define PIN_ADC_NTC_ROOM 35 // ADC1_CH7 VDET_2
+
+// T12
+#define PIN_T12_SLEEP 13 // GPIO
 
 // OLED相关
 #define OLED_SCREEN_WIDTH 128 // OLED 宽度
@@ -61,16 +92,35 @@
 #define SCREEN_FONT_ROW 4
 #define CNSize 12
 
-//温度限制
+// 温度限制
 #define HeatMaxTemp 300 // 最大温度值
 #define HeatMinTemp 0 // 最小温度值
 
-// PWM 输出GPIO配置
-#define PWM_T12 15
-#define PWM_FAN 12
-#define PWM_HEAT 26
-#define PWM_BEEP 25
+// ADC类型定义
+enum _enumADCTYPE {
+    adc_HeatingTemp = 0, // 加热台温度 SPI读取芯片
+    adc_T12Temp, // T12 温度
+    adc_T12Cur, // T12
+    adc_T12NTC, // T12
+    adc_SystemVol, // 系统电压
+    adc_RoomTemp, // 环境温度
+    adc_last_max // 放在末尾
+};
 
-// WS2812 RGB
-#define WS2812RGB GPIO_NUM_32
-#define STRIP_LED_NUMBER 1 // WS2812 LED 个数
+// 时间通知
+extern EventGroupHandle_t pHandleEventGroup;
+
+// 定义各种事件
+enum _logic_event_type {
+    EVENT_LOGIC_MENUEXIT = 1 << 0, // 退出菜单
+    EVENT_LOGIC_MENUENTER = 1 << 1, // 进入菜单
+    EVENT_LOGIC_KEYUPDATE = 1 << 2, // 按键事件
+    EVENT_LOGIC_HEATING = 1 << 3, // 事件 开始加热 停止加热
+};
+
+// 定义模式
+const char heatingModeStr[][32] = {
+    { "恒温焊台" },
+    { "回流焊" },
+    { "T12" },
+};

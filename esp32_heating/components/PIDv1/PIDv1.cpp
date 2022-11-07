@@ -4,34 +4,47 @@
  *    The parameters specified here are those for for which we can't set up
  *    reliable defaults, so we need to have the user set them.
  ***************************************************************************/
-PID::PID(double* Input, double* Output, double* Setpoint,
-    double Kp, double Ki, double Kd, int POn, int ControllerDirection)
+PID::PID(double* Input, double* Output, double* Setpoint, double Kp, double Ki, double Kd, int POn, int ControllerDirection)
 {
     myOutput = Output;
     myInput = Input;
     mySetpoint = Setpoint;
     inAuto = false;
 
-    PID::SetOutputLimits(0, 255); // default output limit corresponds to
-                                  // the arduino pwm limits
+    this->SetOutputLimits(0, 255); // 设置默认的输出限制
 
-    SampleTime = 100 / portTICK_PERIOD_MS; // default Controller Sample Time is 0.1 seconds
+    SampleTime = 100 / portTICK_PERIOD_MS; // 默认的采样频率为100ms
 
-    PID::SetControllerDirection(ControllerDirection);
-    PID::SetTunings(Kp, Ki, Kd, POn);
+    this->SetControllerDirection(ControllerDirection);
+    this->SetTunings(Kp, Ki, Kd, POn);
 
-    lastTime = xTaskGetTickCount() - SampleTime;
+    this->reset();
+    lastTime = xTaskGetTickCount();
 }
 
 /*Constructor (...)*********************************************************
  *    To allow backwards compatability for v1.1, or for people that just want
  *    to use Proportional on Error without explicitly saying so
  ***************************************************************************/
-
-PID::PID(double* Input, double* Output, double* Setpoint,
-    double Kp, double Ki, double Kd, int ControllerDirection)
+PID::PID(double* Input, double* Output, double* Setpoint, double Kp, double Ki, double Kd, int ControllerDirection)
     : PID::PID(Input, Output, Setpoint, Kp, Ki, Kd, P_ON_E, ControllerDirection)
 {
+}
+
+PID::PID(double* Input, double* Output, double* Setpoint, int ControllerDirection)
+    : PID::PID(Input, Output, Setpoint, 0, 0, 0, P_ON_E, ControllerDirection)
+{
+}
+
+/**
+ * @brief 复位所有参数
+ *
+ */
+void PID::reset(void)
+{
+    outputSum = 0;
+    lastInput = 0;
+    lastTime = xTaskGetTickCount();
 }
 
 /* Compute() **********************************************************************
@@ -45,54 +58,71 @@ bool PID::Compute()
     if (!inAuto)
         return false;
 
+    // 得到2次时间差
     TickType_t now = xTaskGetTickCount();
     TickType_t timeChange = (now - lastTime);
 
     if (timeChange >= SampleTime) {
+        // 当前时间差 大于 采样时间差 开始计算
+
         /*Compute all the working error variables*/
-        double input = *myInput;
-        double error = *mySetpoint - input;
-        double dInput = (input - lastInput);
+        double input = *myInput; // PID输入值
+        double error = *mySetpoint - input; // 差值 = 目标值 - 输入值
+        double dInput = (input - lastInput); // PID输入值 - 之前的输入值
+
+        // 计算I
         outputSum += (ki * error);
 
         /*Add Proportional on Measurement, if P_ON_M is specified*/
         if (!pOnE)
             outputSum -= kp * dInput;
 
+        // 限制输出幅度
         if (outputSum > outMax)
             outputSum = outMax;
         else if (outputSum < outMin)
             outputSum = outMin;
 
         /*Add Proportional on Error, if P_ON_E is specified*/
-        double output;
+        double output; // 输出结果
+
+        // 计算P
         if (pOnE)
             output = kp * error;
         else
             output = 0;
 
-        /*Compute Rest of PID Output*/
+        // 计算D
         output += outputSum - kd * dInput;
 
-        if (output > outMax)
+        // 限制输出幅度
+        if (output > outMax) {
             output = outMax;
-        else if (output < outMin)
+        } else if (output < outMin) {
             output = outMin;
+        }
+
+        // 当前输出结果
         *myOutput = output;
 
         /*Remember some variables for next time*/
         lastInput = input;
         lastTime = now;
         return true;
-    } else
+
+    } else {
         return false;
+    }
 }
 
-/* SetTunings(...)*************************************************************
- * This function allows the controller's dynamic performance to be adjusted.
- * it's called automatically from the constructor, but tunings can also
- * be adjusted on the fly during normal operation
- ******************************************************************************/
+/**
+ * @brief 设置PID参数
+ *
+ * @param Kp
+ * @param Ki
+ * @param Kd
+ * @param POn
+ */
 void PID::SetTunings(double Kp, double Ki, double Kd, int POn)
 {
     if (Kp < 0 || Ki < 0 || Kd < 0)
@@ -131,8 +161,7 @@ void PID::SetTunings(double Kp, double Ki, double Kd)
 void PID::SetSampleTime(int NewSampleTime)
 {
     if (NewSampleTime > 0) {
-        double ratio = (double)NewSampleTime
-            / (double)SampleTime;
+        double ratio = (double)NewSampleTime / (double)SampleTime;
         ki *= ratio;
         kd /= ratio;
         SampleTime = (unsigned long)NewSampleTime;
@@ -151,19 +180,22 @@ void PID::SetOutputLimits(double Min, double Max)
 {
     if (Min >= Max)
         return;
+
     outMin = Min;
     outMax = Max;
 
     if (inAuto) {
-        if (*myOutput > outMax)
+        if (*myOutput > outMax) {
             *myOutput = outMax;
-        else if (*myOutput < outMin)
+        } else if (*myOutput < outMin) {
             *myOutput = outMin;
+        }
 
-        if (outputSum > outMax)
+        if (outputSum > outMax) {
             outputSum = outMax;
-        else if (outputSum < outMin)
+        } else if (outputSum < outMin) {
             outputSum = outMin;
+        }
     }
 }
 
@@ -176,7 +208,7 @@ void PID::SetMode(int Mode)
 {
     bool newAuto = (Mode == AUTOMATIC);
     if (newAuto && !inAuto) { /*we just went from manual to auto*/
-        PID::Initialize();
+        this->Initialize();
     }
     inAuto = newAuto;
 }
@@ -211,13 +243,9 @@ void PID::SetControllerDirection(int Direction)
     controllerDirection = Direction;
 }
 
-/* Status Funcions*************************************************************
- * Just because you set the Kp=-1 doesn't mean it actually happened.  these
- * functions query the internal state of the PID.  they're here for display
- * purposes.  this are the functions the PID Front-end uses for example
- ******************************************************************************/
 double PID::GetKp() { return dispKp; }
 double PID::GetKi() { return dispKi; }
 double PID::GetKd() { return dispKd; }
+
 int PID::GetMode() { return inAuto ? AUTOMATIC : MANUAL; }
 int PID::GetDirection() { return controllerDirection; }

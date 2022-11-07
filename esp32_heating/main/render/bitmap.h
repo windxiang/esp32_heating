@@ -6,16 +6,6 @@ extern "C" {
 
 #include "stdint.h"
 
-// 128x64
-extern uint8_t Logo[];
-// width: 170, height: 128
-extern uint8_t Logo2[];
-
-extern uint8_t Logo_RoboBrave[];
-
-extern uint8_t TranAnimation[];
-extern uint8_t TranAnimation2[];
-
 extern uint8_t QRC[];
 extern uint8_t Set0[];
 extern uint8_t Set1[];
@@ -77,6 +67,9 @@ extern uint8_t c5[];
 extern uint8_t c6[];
 extern uint8_t c7[];
 extern uint8_t CheckBoxSelection[];
+
+extern uint8_t pidImg[];
+extern uint8_t kalmanImg[];
 
 #ifdef __cplusplus
 }

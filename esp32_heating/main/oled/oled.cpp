@@ -90,7 +90,7 @@ uint8_t u8g2_esp32_gpio_and_delay_cb(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int,
 
     case U8X8_MSG_DELAY_MILLI:
         // Delay for the number of milliseconds passed in through arg_int.
-        vTaskDelay(arg_int / portTICK_PERIOD_MS);
+        delay(arg_int);
         break;
     }
     return 0;
@@ -117,13 +117,16 @@ void oled_init(int sda_io_num, int scl_io_num, uint32_t freqHZ, i2c_mode_t mode)
     u8g2_SetPowerSave(&u8g2, 0);
     u8g2_ClearBuffer(&u8g2);
 
+    u8g2_SetFontPosTop(&u8g2); // 设置字体基线为Top
+
+    u8g2_SetFont(&u8g2, u8g2_font_sticker_mel_tr);
+    u8g2_DrawStr(&u8g2, 20, 25, "HelloWorld");
+
     u8g2_SetFont(&u8g2, u8g2_font_wqy12_t_gb2312); // 设置一个默认的字体
     u8g2_SetDrawColor(&u8g2, 1);
     u8g2_SetFontMode(&u8g2, 1);
 
     // u8g2_SetFontDirection(&u8g2, 1);
-
-    u8g2_SetFontPosTop(&u8g2); // 设置字体基线为Top
 
     // u8g2_DrawBox(&u8g2, 0, 0, 10, 15);
     // u8g2_DrawFrame(&u8g2, 0, 26, 100, 6);
@@ -131,6 +134,8 @@ void oled_init(int sda_io_num, int scl_io_num, uint32_t freqHZ, i2c_mode_t mode)
     // u8g2_DrawStr(&u8g2, 0, 0, "Hi World!");
     // u8g2_DrawUTF8(&u8g2, 0, 1, "abc");
     u8g2_SendBuffer(&u8g2);
+
+    delay(1000);
 }
 
 /**

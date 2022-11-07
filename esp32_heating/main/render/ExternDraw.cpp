@@ -4,13 +4,9 @@
 #include <string.h>
 #include "bitmap.h"
 
-double TipTemperature = 0; // PID输入值 (当前温度)
-double PID_Output = 0; // PID输出值 要输出PWM宽度
-double PID_Setpoint = 0; // PID目标值 (设定温度值)
-
-uint32_t POWER = 0;
-uint8_t PWM_Resolution = 10; // 分辨率
-float BoostTime = 0; // 爆发模式持续时间
+#ifndef getByte
+#define getByte(addr) (*(const unsigned char*)(addr))
+#endif // getByte
 
 void EnterLogo(void)
 {
@@ -30,6 +26,7 @@ void EnterLogo(void)
     //     Display();
     // }
     // Disp.setDrawColor(1);
+
 #if 0
     float rate, i = 1;
     int x, y, w;
@@ -99,12 +96,8 @@ void ClearOLEDBuffer(void)
 void Display(void)
 {
     // PlaySoundLoop();
-
-    // OLED_ScreenshotPrint();
-
     u8g2_SendBuffer(&u8g2);
-
-    vTaskDelay(1);
+    delay(1);
 }
 
 /**
@@ -237,17 +230,23 @@ void Draw_Pixel_Resize(int x, int y, int ox, int oy, int w, int h)
     u8g2_DrawBox(&u8g2, ox + xi * w, oy + yi * h, w, h);
 }
 
-#ifndef pgm_read_byte
-#define pgm_read_byte(addr) (*(const unsigned char*)(addr))
-#endif // pgm_read_byte
-
+/**
+ * @brief 在指定位置绘制图标
+ *
+ * @param x 指定位置
+ * @param y 指定位置
+ * @param bitmap 图标
+ * @param w 绘制大小
+ * @param h 绘制大小
+ */
 void Draw_Slow_Bitmap(int x, int y, const unsigned char* bitmap, unsigned char w, unsigned char h)
 {
     uint8_t color = u8g2_GetDrawColor(&u8g2);
     int xi, yi, intWidth = (w + 7) / 8;
+
     for (yi = 0; yi < h; yi++) {
         for (xi = 0; xi < w; xi++) {
-            if (pgm_read_byte(bitmap + yi * intWidth + xi / 8) & (128 >> (xi & 7))) {
+            if (getByte(bitmap + yi * intWidth + xi / 8) & (128 >> (xi & 7))) {
                 u8g2_DrawPixel(&u8g2, x + xi, y + yi);
 
             } else if (color != 2) {
@@ -262,12 +261,12 @@ void Draw_Slow_Bitmap(int x, int y, const unsigned char* bitmap, unsigned char w
 /**
  * @brief 位图缩放 代码片段改自arduboy2
  *
- * @param x
- * @param y
- * @param bitmap
- * @param w1
+ * @param x 起始坐标
+ * @param y 起始坐标
+ * @param bitmap 位图数据
+ * @param w1 原始大小
  * @param h1
- * @param w2
+ * @param w2 目标大小
  * @param h2
  */
 void Draw_Slow_Bitmap_Resize(int x, int y, uint8_t* bitmap, int w1, int h1, int w2, int h2)
@@ -281,7 +280,7 @@ void Draw_Slow_Bitmap_Resize(int x, int y, uint8_t* bitmap, int w1, int h1, int 
 
     for (yi = 0; yi < h1; yi++) {
         for (xi = 0; xi < w1; xi++) {
-            if (pgm_read_byte(bitmap + yi * byteWidth + xi / 8) & (1 << (7 - (xi & 7)))) {
+            if (getByte(bitmap + yi * byteWidth + xi / 8) & (1 << (7 - (xi & 7)))) {
                 u8g2_DrawBox(&u8g2, x + xi * mw, y + yi * mh, cmw, cmh);
             } else if (color != 2) {
                 u8g2_SetDrawColor(&u8g2, 0);
@@ -290,39 +289,6 @@ void Draw_Slow_Bitmap_Resize(int x, int y, uint8_t* bitmap, int w1, int h1, int 
             }
         }
     }
-}
-
-//绘制屏保-密集运算线条
-void DrawIntensiveComputingLine(void)
-{
-    static uint8_t Line[4];
-    for (uint8_t a = 0; a < 4; a++) {
-        Line[a] += rand() % 2 - 1;
-        if (Line[a] > 128)
-            Line[a] -= 128;
-        for (uint8_t b = 0; b < rand() % 3 + 3; b++) {
-            u8g2_DrawHLine(&u8g2, 0, Line[a] + rand() % 20 - 10, 128); //水平线
-            u8g2_DrawVLine(&u8g2, Line[a] + rand() % 20 - 10, 0, 64); //垂直线
-        }
-    }
-}
-
-// FP 密集运算屏保
-void DrawIntensiveComputing(void)
-{
-    float calculate;
-
-    //随机线条
-    DrawIntensiveComputingLine();
-
-    calculate = sin(xTaskGetTickCount() / 4000.0);
-    //模拟噪点
-    for (int i = 0; i < calculate * 256 + 256; i++)
-        u8g2_DrawPixel(&u8g2, rand() % 128, rand() % 64);
-
-    //波浪警告声
-    // SetTone(64 + calculate * 64 + rand() % 16 - 8);
-    // SetTone(1500 + calculate * 500 + rand() % 64 - 32 - (((xTaskGetTickCount() / 1000) % 2 == 1) ? 440 : 0));
 }
 
 /***
@@ -370,50 +336,6 @@ void DrawHighLightText(int x, int y, const char* s)
         u8g2_DrawUTF8(&u8g2, x + 1, y + 2, s);
         u8g2_SetDrawColor(&u8g2, color);
     }
-}
-
-/***
- * @description: 绘制温度状态条
- * @param bool color 颜色
- * @return {*}
- */
-void DrawStatusBar(bool color)
-{
-    u8g2_SetDrawColor(&u8g2, color);
-    //温度条
-    //框
-    u8g2_DrawFrame(&u8g2, 0, 53, 103, 11);
-    //条
-    if (TipTemperature <= HeatMaxTemp)
-        u8g2_DrawBox(&u8g2, 0, 53, map(TipTemperature, HeatMinTemp, HeatMaxTemp, 5, 98), 11);
-
-    //功率条
-    u8g2_DrawFrame(&u8g2, 104, 53, 23, 11);
-    u8g2_DrawBox(&u8g2, 104, 53, map(POWER, 0, pow(2, PWM_Resolution) - 1, 0, 23), 11);
-
-    u8g2_DrawHLine(&u8g2, 117, 51, 11);
-    u8g2_DrawPixel(&u8g2, 103, 52);
-    u8g2_DrawPixel(&u8g2, 127, 52);
-
-    //////////////进入反色////////////////////////////////
-    u8g2_SetDrawColor(&u8g2, 2);
-
-    //画指示针
-    // Draw_Slow_Bitmap(map(PID_Setpoint, HeatMinTemp, HeatMaxTemp, 5, 98) - 4, 54, PositioningCursor, 8, 8);
-
-    char buf[128];
-    // sprintf("%.0f", PID_Setpoint);
-    u8g2_DrawUTF8(&u8g2, 2, 53, buf);
-
-    // 显示输出功率 百分比
-    // sprintf("%d%%", map(POWER, 0, pow(2, PWM_Resolution) - 1, 0, 100));
-    u8g2_DrawUTF8(&u8g2, 105, 53, buf);
-
-    //显示真实功率
-    // u8g2_Printf(&u8g2, "%.0fW", SYS_Voltage * SYS_Current);
-
-    // arduboy.setCursor(105, 55); arduboy.print(map(PID_Output, 255, 0, 0, 100)); arduboy.print(F("%")); //功率百分比
-    u8g2_SetDrawColor(&u8g2, color);
 }
 
 /**
@@ -512,13 +434,13 @@ void TextEditor(const char* title, char* text, int32_t textSize)
         //处理按键事件
         ROTARY_BUTTON_TYPE rotaryButton = getRotaryButton();
         switch (rotaryButton) {
-        case BUTTON_CLICK:
+        case RotaryButton_Click:
             // 单击切换编辑器状态
             editFlag = !editFlag;
             break;
 
-        case BUTTON_LONGCLICK:
-        case BUTTON_DOUBLECLICK:
+        case RotaryButton_LongClick:
+        case RotaryButton_DoubleClick:
             // 保存并退出
             strncpy(text, newText, textSize);
             exitRenameGUI = true;
@@ -554,13 +476,12 @@ uint32_t Get_UTF8_Ascii_Pix_Len(uint8_t size, const char* s)
 */
 void DrawPageFootnotes(int curPage, int TotalPage)
 {
-    char buffer[20];
-    const TickType_t destTime = 1000 / portTICK_PERIOD_MS;
-    const uint8_t w = (GetNumberLength(curPage) + GetNumberLength(TotalPage) + 3) * 6;
-    const uint8_t x = OLED_SCREEN_WIDTH - 8 - w;
-    const uint8_t y = OLED_SCREEN_HEIGHT - 12;
+    if (xTaskGetTickCount() < (getUserOperatorTick() + 1000)) {
+        char buffer[20];
+        const uint8_t w = (GetNumberLength(curPage) + GetNumberLength(TotalPage) + 3) * 6;
+        const uint8_t x = OLED_SCREEN_WIDTH - 8 - w;
+        const uint8_t y = OLED_SCREEN_HEIGHT - 12;
 
-    if (xTaskGetTickCount() < g_ShowPageNumTime + destTime) {
         //绘制白色底色块
         u8g2_SetDrawColor(&u8g2, 1);
         u8g2_DrawRBox(&u8g2, x + 1, y - 1, w, 13, 1);
@@ -569,10 +490,10 @@ void DrawPageFootnotes(int curPage, int TotalPage)
         u8g2_SetDrawColor(&u8g2, 0);
         sprintf(buffer, "[%d/%d]", curPage, TotalPage);
         u8g2_DrawUTF8(&u8g2, x, y + 1, buffer);
-    }
 
-    // 恢复颜色设置
-    u8g2_SetDrawColor(&u8g2, 1);
+        // 恢复颜色设置
+        u8g2_SetDrawColor(&u8g2, 1);
+    }
 }
 
 /**
@@ -598,12 +519,13 @@ void Draw_APP(int x, int y, uint8_t* bitmap)
  */
 void DrawTempCurve(void)
 {
-    int y;
-    CalculateTemp(0, HeatingConfig.curConfig.PTemp);
+    int y = 0;
+    float allTime = 0.0f; // 全部用时
+    CalculateTemp(0, HeatingConfig.curConfig.PTemp, &allTime);
 
-    int countStep = BoostTime / 127 + 1;
+    int countStep = allTime / OLED_SCREEN_WIDTH; // 根据OLED宽度进行等比
 
-    RotarySet(0, 127, 1, 0);
+    RotarySet(0, OLED_SCREEN_WIDTH - 1, 1, 0);
 
     while (BUTTON_NULL == getRotaryButton()) {
         // 得到编码器位置
@@ -614,15 +536,15 @@ void DrawTempCurve(void)
         // 绘制参考文字
         char buffer[64];
         sprintf(buffer, "时间 %dm%ds", (int)(rotaryPositon * countStep) / 60, (int)(rotaryPositon * countStep) % 60);
-        DrawHighLightText(128 - u8g2_GetUTF8Width(&u8g2, buffer) - 2, 36, buffer);
+        DrawHighLightText(OLED_SCREEN_WIDTH - u8g2_GetUTF8Width(&u8g2, buffer) - 2, 36, buffer);
 
-        sprintf(buffer, "温度 %.1f", CalculateTemp(rotaryPositon * countStep, HeatingConfig.curConfig.PTemp));
-        DrawHighLightText(128 - u8g2_GetUTF8Width(&u8g2, buffer) - 2, 51, buffer);
+        sprintf(buffer, "温度 %.1f", CalculateTemp(rotaryPositon * countStep, HeatingConfig.curConfig.PTemp, NULL));
+        DrawHighLightText(OLED_SCREEN_WIDTH - u8g2_GetUTF8Width(&u8g2, buffer) - 2, 51, buffer);
 
         // 绘制曲线
         u8g2_SetDrawColor(&u8g2, 2);
-        for (int x = 0; x < 128; x++) {
-            y = map(CalculateTemp(x * countStep, HeatingConfig.curConfig.PTemp), 0, (HeatingConfig.curConfig.PTemp[4] > HeatingConfig.curConfig.PTemp[1] ? HeatingConfig.curConfig.PTemp[4] : HeatingConfig.curConfig.PTemp[1]) + 1, 0, 63);
+        for (int x = 0; x < OLED_SCREEN_WIDTH; x++) {
+            y = map(CalculateTemp(x * countStep, HeatingConfig.curConfig.PTemp, NULL), 0, (HeatingConfig.curConfig.PTemp[4] > HeatingConfig.curConfig.PTemp[1] ? HeatingConfig.curConfig.PTemp[4] : HeatingConfig.curConfig.PTemp[1]) + 1, 0, 63);
             u8g2_DrawPixel(&u8g2, x, 63 - y);
 
             // 画指示针
@@ -632,9 +554,9 @@ void DrawTempCurve(void)
 
         u8g2_SetDrawColor(&u8g2, 1);
 
-        // 绘制底部点点
+        // 绘制背景点
         for (int yy = 0; yy < 64; yy += 8) {
-            for (int xx = 0; xx < 128; xx += 8) {
+            for (int xx = 0; xx < OLED_SCREEN_WIDTH; xx += 8) {
                 u8g2_DrawPixel(&u8g2, xx + 2, yy + 4);
             }
         }
@@ -658,12 +580,12 @@ void PopWindows(const char* s)
     const int y = (OLED_SCREEN_HEIGHT - h) / 2;
 
     u8g2_SetDrawColor(&u8g2, 0);
-    Blur(0, 0, OLED_SCREEN_WIDTH, OLED_SCREEN_HEIGHT, 3, 66 * *SwitchControls[SwitchSpace_SmoothAnimation]); //<=15FPS以便人眼察觉细节变化
+    Blur(0, 0, OLED_SCREEN_WIDTH, OLED_SCREEN_HEIGHT, 3, 66 * *SwitchControls[SwitchComponents_SmoothAnimation]); //<=15FPS以便人眼察觉细节变化
 
     int ix = 0;
     for (int i = 1; i <= 10; i++) {
         //震荡动画
-        if (*SwitchControls[SwitchSpace_SmoothAnimation])
+        if (*SwitchControls[SwitchComponents_SmoothAnimation])
             ix = (10 * cos((i * 3.14) / 2.0)) / i;
 
         u8g2_SetDrawColor(&u8g2, 0);
@@ -676,6 +598,6 @@ void PopWindows(const char* s)
         u8g2_SetDrawColor(&u8g2, 1);
 
         Display();
-        delay(20 * *SwitchControls[SwitchSpace_SmoothAnimation]);
+        delay(20 * *SwitchControls[SwitchComponents_SmoothAnimation]);
     }
 }

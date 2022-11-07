@@ -6,18 +6,23 @@ extern "C" {
 
 typedef enum {
     BUTTON_NULL = 0, // 无
-    BUTTON_CLICK = 1, // 单击
-    BUTTON_LONGCLICK = 2, // 长按
-    BUTTON_DOUBLECLICK = 3, // 双击
+    RotaryButton_Click = 1, // 编码器按键-单击
+    RotaryButton_LongClick, // 编码器按键-长按
+    RotaryButton_DoubleClick, // 编码器按键-双击
+    NormalButton_Click,
+    NormalButton_LongClick,
+    NormalButton_DoubleClick,
 } ROTARY_BUTTON_TYPE;
 
-void rotary_task(void* arg);
 void RotarySet(float min, float max, float step, float position);
 void RotarySetPositon(float position);
 
 float GetRotaryPositon(void);
 void setRotaryLock(bool isLock);
 ROTARY_BUTTON_TYPE getRotaryButton(void);
+void rotaryResetQueue(void);
+
+void rotaryInit(void);
 
 #ifdef __cplusplus
 }

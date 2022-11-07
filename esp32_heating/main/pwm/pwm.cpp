@@ -16,7 +16,7 @@ static const ledc_timer_config_t pwm_timer = {
 static const ledc_channel_config_t pwm_channel[_TYPE_MAX] = {
     // PWM T12
     [_TYPE_T12] = {
-        .gpio_num = PWM_T12,
+        .gpio_num = PIN_PWM_T12,
         .speed_mode = LEDC_HIGH_SPEED_MODE,
         .channel = LEDC_CHANNEL_0,
         .intr_type = LEDC_INTR_DISABLE,
@@ -29,7 +29,7 @@ static const ledc_channel_config_t pwm_channel[_TYPE_MAX] = {
     },
     // PWM 风扇
     [_TYPE_FAN] = {
-        .gpio_num = PWM_FAN,
+        .gpio_num = PIN_PWM_FAN,
         .speed_mode = LEDC_HIGH_SPEED_MODE,
         .channel = LEDC_CHANNEL_1,
         .intr_type = LEDC_INTR_DISABLE,
@@ -42,7 +42,7 @@ static const ledc_channel_config_t pwm_channel[_TYPE_MAX] = {
     },
     // PWM 加热台
     [_TYPE_HEAT] = {
-        .gpio_num = PWM_HEAT,
+        .gpio_num = PIN_PWM_HEAT,
         .speed_mode = LEDC_HIGH_SPEED_MODE,
         .channel = LEDC_CHANNEL_2,
         .intr_type = LEDC_INTR_DISABLE,
@@ -55,7 +55,7 @@ static const ledc_channel_config_t pwm_channel[_TYPE_MAX] = {
     },
     // PWM 蜂鸣器
     [_TYPE_BEEP] = {
-        .gpio_num = PWM_BEEP,
+        .gpio_num = PIN_PWM_BEEP,
         .speed_mode = LEDC_HIGH_SPEED_MODE,
         .channel = LEDC_CHANNEL_3,
         .intr_type = LEDC_INTR_DISABLE,

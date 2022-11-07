@@ -7,17 +7,31 @@
 // 加热台 相关
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-//卡尔曼滤波
+// 卡尔曼滤波配置
 typedef struct
 {
-    float LastP; //上次估算协方差 初始化值为0.02
-    float Now_P; //当前估算协方差 初始化值为0
-    float out; //卡尔曼滤波器输出 初始化值为0
-    float Kg; //卡尔曼增益 初始化值为0
-    float Q; //过程噪声协方差 初始化值为0.001
-    float R; //观测噪声协方差 初始化值为0.543
-} KFP; // Kalman Filter parameter
+    float LastP; // 上次估算协方差 初始化值为0.02
+    float Now_P; // 当前估算协方差 初始化值为0
+    float out; // 卡尔曼滤波器输出 初始化值为0
+    float Kg; // 卡尔曼增益 初始化值为0
+} _KalmanFilter; // Kalman Filter parameter
 
+typedef struct {
+    uint8_t UseKalman; // 使用卡尔曼
+    float Cycle; // ADC采样周期(ms)
+    float TempCompenstation; // 温度补偿
+    float KalmanQ; // 过程噪声协方差
+    float KalmanR; // 观测噪声协方差
+} _KalmanParm; // 卡尔曼滤波参数
+
+typedef struct {
+    _KalmanFilter filter;
+    _KalmanParm parm;
+} _KalmanInfo;
+
+extern _KalmanInfo KalmanInfo[];
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief 加热台 T12类型配置
  *
@@ -33,10 +47,13 @@ enum HEATINGTYPE {
  *
  */
 struct _HeatingConfig {
-    std::string name; // 名称
+    char name[20]; // 名称
     HEATINGTYPE type; // 类型
     float PTemp[7]; // 温度曲线
-    float PID[2][3]; // PID系数{远PID，近PID}
+    float PIDSample; // PID采样时间
+    float PIDTemp; // 远近PID切换温度
+    float PID[2][3]; // PID系数[远PID，近PID]
+    float targetTemp; // 恒温模式目标输出温度(°C)
 };
 
 /**
@@ -68,6 +85,7 @@ struct _SystemMenuSaveData {
     uint8_t Volume; // 编码器声音设置
     uint8_t PanelSettings; // 面板设置 详细面板 简约面板
     uint8_t OptionStripFixedLength_Flag; // 选项条固定 自适应
+    float ScreenProtectorTime; // 屏保在休眠后的触发时间 (秒)
     float ScreenBrightness; // 屏幕亮度
     float UndervoltageAlert; // 系统电压 欠压警告阈值 (单位V)
     char BLEName[20]; // 蓝牙设备名称
@@ -79,69 +97,96 @@ extern _SystemMenuSaveData SystemMenuSaveData;
  * @brief 开关控件 用于存储开关控件的值
  *
  */
-enum Switch_space_Obj {
+enum SwitchComponents_Obj {
     ///////////////////////////////////////////////
-    SwitchSpace_Language, // 语言设置
-    SwitchSpace_BLE_State, // 蓝牙开关
-    SwitchSpace_ScreenFlip, // 翻转OLED
-    SwitchSpace_MenuListMode, // 图标模式 列表模式
-    SwitchSpace_SmoothAnimation, // 过度动画标志位
-    SwitchSpace_Volume, // 声音设置
-    SwitchSpace_PanelSettings, // 面板设置 详细面板 简约面板
-    SwitchSpace_OptionWidth, // 选项条固定 自适应
-    // SwitchSpace_RotaryDirection, // 编码器反向
+    SwitchComponents_Language, // 语言设置
+    SwitchComponents_BLE_State, // 蓝牙开关
+    SwitchComponents_ScreenFlip, // 翻转OLED
+    SwitchComponents_MenuListMode, // 图标模式 列表模式
+    SwitchComponents_SmoothAnimation, // 过度动画标志位
+    SwitchComponents_Volume, // 声音设置
+    SwitchComponents_PanelSettings, // 面板设置 详细面板 简约面板
+    SwitchComponents_OptionWidth, // 选项条固定 自适应
+    // SwitchComponents_RotaryDirection, // 编码器反向
 
     ///////////////////////////////////////////////
-    SwitchSpace_PIDMode,
-    SwitchSpace_KFP,
-    SwitchSpace_HandleTrigger,
-    SwitchSpace_CurConfigIndex, // 当前加热台配置索引
+    SwitchComponents_CurConfigIndex, // 当前加热台配置索引
+    SwitchComponents_HeatMoe, // 恒温加热台 回流焊加热台 T12加热台
+    SwitchComponents_T12VibrationDetection, // T12 震动开关检测配置
+    // 卡尔曼滤波开关
+    SwitchComponents_KFP1, // 卡尔曼滤波开关
+    SwitchComponents_KFP2, // 卡尔曼滤波开关
+    SwitchComponents_KFP3, // 卡尔曼滤波开关
+    SwitchComponents_KFP4, // 卡尔曼滤波开关
+    SwitchComponents_KFP5, // 卡尔曼滤波开关
+    SwitchComponents_KFP6, // 卡尔曼滤波开关
 };
 
 /**
  * @brief 滑动条控件 用于存储滑动条控件的值
  *
  */
-enum Slide_space_Obj {
+enum SlideComponents_Obj {
     ///////////////////////////////////////////////
-    Slide_space_ScreenBrightness, // 屏幕亮度
-    Slide_space_UndervoltageAlert, // 欠压提醒
-    Slide_space_Scroll, // 文本渲染模式下使用 每页显示4个条目 中的第几条
+    SlideComponents_ScreenBrightness, // 屏幕亮度
+    SlideComponents_UndervoltageAlert, // 欠压提醒
+    SlideComponents_Scroll, // 文本渲染模式下使用 每页显示4个条目 中的第几条
     ///////////////////////////////////////////////
 
-    Slide_space_BootTemp, // 启动温度
-    Slide_space_SleepTemp, // 休眠温度
-    // Slide_space_BoostTemp,
+    SlideComponents_ShutdownTime, // 停机触发(分)
+    SlideComponents_ScreenProtectorTime, // 屏保触发(秒)
 
-    Slide_space_ShutdownTime, // 停机触发(分)
-    Slide_space_SleepTime, // 休眠触发(分)
-    // Slide_space_BoostTime,
-    Slide_space_ScreenProtectorTime, // 屏保触发(秒)
-
-    Slide_space_KFP_Q, // 过程噪声协方差
-    Slide_space_KFP_R, // 观察噪声协方差
-
-    // Slide_space_SamplingRatioWork,
-    Slide_space_ADC_PID_Cycle_List_0, // 温差>150
-    Slide_space_ADC_PID_Cycle_List_1, // 温差>50
-    Slide_space_ADC_PID_Cycle_List_2, // 温差≤50
+    SlideComponents_TargetTemp, // 恒温模式目标输出温度(°C)
 
     // 温度曲线
-    Slide_space_PTemp_0, // 升温斜率
-    Slide_space_PTemp_1, // 预热区温度(摄氏度)
-    Slide_space_PTemp_2, // 预热区时间(秒)
-    Slide_space_PTemp_3, // 升温斜率
-    Slide_space_PTemp_4, // 回流区温度(摄氏度)
-    Slide_space_PTemp_5, // 回流区时间(秒)
-    Slide_space_PTemp_6, // 降温斜率
+    SlideComponents_PTemp_0, // 预热区升温斜率
+    SlideComponents_PTemp_1, // 预热区温度(摄氏度)
+    SlideComponents_PTemp_2, // 预热区维持时间(秒)
+    SlideComponents_PTemp_3, // 回流区升温斜率
+    SlideComponents_PTemp_4, // 回流区温度(摄氏度)
+    SlideComponents_PTemp_5, // 回流区维持时间(秒)
+    SlideComponents_PTemp_6, // 降温斜率
 
     // PID参数
-    Slide_space_PID_AP, // 比例P(爬升期)
-    Slide_space_PID_AI, // 积分I
-    Slide_space_PID_AD, // 微分D
-    Slide_space_PID_CP, // 比例P(接近期)
-    Slide_space_PID_CI, // 积分I
-    Slide_space_PID_CD, // 微分D
+    SlideComponents_PIDSample, // PID采样时间
+    SlideComponents_SwitchTemp, // PID温度切换度数
+    SlideComponents_PID_AP, // 比例P(爬升期)
+    SlideComponents_PID_AI, // 积分I
+    SlideComponents_PID_AD, // 微分D
+    SlideComponents_PID_CP, // 比例P(接近期)
+    SlideComponents_PID_CI, // 积分I
+    SlideComponents_PID_CD, // 微分D
+
+    // 卡尔曼滤波
+    SlideComponents_ADC_Cycle1, // 热电偶采样周期(ms)
+    SlideComponents_TempComp_1, // 温度补偿
+    SlideComponents_KFP_Q1, // 过程噪声协方差
+    SlideComponents_KFP_R1, // 观察噪声协方差
+
+    SlideComponents_ADC_Cycle2, // 热电偶采样周期(ms)
+    SlideComponents_TempComp_2, // 温度补偿
+    SlideComponents_KFP_Q2, // 过程噪声协方差
+    SlideComponents_KFP_R2, // 观察噪声协方差
+
+    SlideComponents_ADC_Cycle3, // 热电偶采样周期(ms)
+    SlideComponents_TempComp_3, // 温度补偿
+    SlideComponents_KFP_Q3, // 过程噪声协方差
+    SlideComponents_KFP_R3, // 观察噪声协方差
+
+    SlideComponents_ADC_Cycle4, // 热电偶采样周期(ms)
+    SlideComponents_TempComp_4, // 温度补偿
+    SlideComponents_KFP_Q4, // 过程噪声协方差
+    SlideComponents_KFP_R4, // 观察噪声协方差
+
+    SlideComponents_ADC_Cycle5, // 热电偶采样周期(ms)
+    SlideComponents_TempComp_5, // 温度补偿
+    SlideComponents_KFP_Q5, // 过程噪声协方差
+    SlideComponents_KFP_R5, // 观察噪声协方差
+
+    SlideComponents_ADC_Cycle6, // 热电偶采样周期(ms)
+    SlideComponents_TempComp_6, // 温度补偿
+    SlideComponents_KFP_Q6, // 过程噪声协方差
+    SlideComponents_KFP_R6, // 观察噪声协方差
 };
 
 // 滑动菜单结构体
@@ -179,6 +224,7 @@ enum PANELSET {
     PANELSET_Detailed, // 详细模式
 };
 
+// T12 震动开关
 enum HANDLETRIGGER {
     HANDLETRIGGER_VibrationSwitch = 0,
     HANDLETRIGGER_ReedSwitch,
@@ -232,6 +278,10 @@ extern "C" {
 void initMenuSystem(void);
 menuSystem* getCurRenderMenu(int menuID);
 subMenu* getSubMenu(menuSystem* pMenuRoot, int id);
+_HeatingConfig* getCurrentHeatingConfig(void);
+float getScreenProtectorTime(void);
+float getSystemVoltage(void);
+uint8_t getBlueToolsStatus(void);
 
 #ifdef __cplusplus
 }

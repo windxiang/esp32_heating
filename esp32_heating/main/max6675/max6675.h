@@ -4,9 +4,9 @@
 extern "C" {
 #endif // __cplusplus
 
-extern TickType_t g_ShowPageNumTime;
-
-void TimerUpdateEvent(void);
+void max6675Init(void);
+float MAX6675ReadFahrenheit(void);
+float MAX6675ReadCelsius(void);
 
 #ifdef __cplusplus
 }

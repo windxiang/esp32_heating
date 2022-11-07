@@ -121,7 +121,7 @@ void WS2812Set(uint32_t red, uint32_t green, uint32_t blue)
  */
 void WS2812init(void)
 {
-    rmt_config_t config = RMT_DEFAULT_CONFIG_TX(WS2812RGB, RMT_TX_CHANNEL);
+    rmt_config_t config = RMT_DEFAULT_CONFIG_TX(PIN_WS2812RGB, RMT_TX_CHANNEL);
     config.clk_div = 2; // set counter clock to 40MHz
 
     rmt_config(&config);

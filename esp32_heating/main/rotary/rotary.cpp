@@ -20,17 +20,25 @@ typedef struct {
 static _RotaryData RotaryData = {};
 
 static OneButton RotaryButton(PIN_BUTTON, true); // 编码器按键逻辑处理
+static OneButton NormalButton(PIN_KEY1, true); // 普通按键
 
 #define ROTARY_FREQDIV 2.0f // 编码器分频
 
+////////////////////////////////////////////////////////////////////////////////////////////////
+// 发送按下事件
+static void sendButtonEvent(_logic_event_type event)
+{
+    if (NULL != pHandleEventGroup)
+        xEventGroupSetBits(pHandleEventGroup, event);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief 编码器中断
  *
  */
 static void IRAM_ATTR rotary_handler(void* arg)
 {
-    TimerUpdateEvent();
-
     // 若编码器被锁定，则不允许数值操作
     if (RotaryData.EncoderLOCKFlag == true)
         return;
@@ -59,51 +67,93 @@ static void IRAM_ATTR rotary_handler(void* arg)
     }
 }
 
-/***
- * @description: 按键单击回调函数
- * @param {*}
- * @return {*}
+////////////////////////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief 编码器按键-单击回调函数
+ *
  */
 static void RotaryButtonClick(void)
 {
     if (NULL != RotaryData.buttonQueue) {
         // SetSound(Beep1);
-        TimerUpdateEvent();
-        ROTARY_BUTTON_TYPE f = BUTTON_CLICK;
+        ROTARY_BUTTON_TYPE f = RotaryButton_Click;
         xQueueSend(RotaryData.buttonQueue, &f, 0);
+        sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
     }
 }
 
-/***
- * @description: 按键长按回调函数
- * @param {*}
- * @return {*}
+/**
+ * @brief 编码器按键-长按回调函数
+ *
  */
 static void RotaryButtonLongClick(void)
 {
     if (NULL != RotaryData.buttonQueue) {
         // SetSound(Beep1);
-        TimerUpdateEvent();
-        ROTARY_BUTTON_TYPE f = BUTTON_LONGCLICK;
+        ROTARY_BUTTON_TYPE f = RotaryButton_LongClick;
         xQueueSend(RotaryData.buttonQueue, &f, 0);
+        sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
     }
 }
 
-/***
- * @description: 按键双击回调函数
- * @param {*}
- * @return {*}
+/**
+ * @brief 编码器按键-双击回调函数
+ *
  */
 static void RotaryButtonDoubleClick(void)
 {
     if (NULL != RotaryData.buttonQueue) {
         // SetSound(Beep1);
-        TimerUpdateEvent();
-        ROTARY_BUTTON_TYPE f = BUTTON_DOUBLECLICK;
+        ROTARY_BUTTON_TYPE f = RotaryButton_DoubleClick;
         xQueueSend(RotaryData.buttonQueue, &f, 0);
+        sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////
+/**
+ * @brief 普通按键-单击回调函数
+ *
+ */
+static void NormalButtonClick(void)
+{
+    if (NULL != RotaryData.buttonQueue) {
+        // SetSound(Beep1);
+        ROTARY_BUTTON_TYPE f = NormalButton_Click;
+        xQueueSend(RotaryData.buttonQueue, &f, 0);
+        sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
+    }
+}
+
+/**
+ * @brief 普通按键-长按回调函数
+ *
+ */
+static void NormalButtonLongClick(void)
+{
+    if (NULL != RotaryData.buttonQueue) {
+        // SetSound(Beep1);
+        ROTARY_BUTTON_TYPE f = NormalButton_LongClick;
+        xQueueSend(RotaryData.buttonQueue, &f, 0);
+        sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
+    }
+}
+
+/**
+ * @brief 普通按键-双击回调函数
+ *
+ */
+static void NormalButtonDoubleClick(void)
+{
+    if (NULL != RotaryData.buttonQueue) {
+        // SetSound(Beep1);
+        ROTARY_BUTTON_TYPE f = NormalButton_DoubleClick;
+        xQueueSend(RotaryData.buttonQueue, &f, 0);
+        sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief 设置计数器参数
  *
@@ -153,6 +203,7 @@ void setRotaryLock(bool isLock)
     RotaryData.EncoderLOCKFlag = isLock;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////
 /**
  * @brief 获取编码器按键状态
  *
@@ -169,16 +220,47 @@ ROTARY_BUTTON_TYPE getRotaryButton(void)
 }
 
 /**
+ * @brief 清空队列
+ *
+ */
+void rotaryResetQueue(void)
+{
+    if (NULL != RotaryData.buttonQueue) {
+        xQueueReset(RotaryData.buttonQueue);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+/**
  * @brief 编码器线程初始化
  *
  * @param arg
  */
-void rotary_task(void* arg)
+static void rotary_task(void* arg)
+{
+    // 设置中断函数
+    // gpio_isr_handler_add(PIN_ROTARY_A, rotary_handler, NULL);
+
+    uint8_t f;
+    while (1) {
+        // 编码器旋转
+        if (xQueueReceive(RotaryData.encoderQueue, &f, 10 / portTICK_PERIOD_MS) == pdPASS) {
+            RotaryData.EncoderPosition = constrain(RotaryData.EncoderPosition + (f ? RotaryData.EncoderStepPosition : -RotaryData.EncoderStepPosition), RotaryData.EncoderMinPosition, RotaryData.EncoderMaxPosition);
+            sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
+        }
+
+        // 编码器按键
+        RotaryButton.tick();
+
+        // 普通按键
+        NormalButton.tick();
+    }
+}
+
+void rotaryInit(void)
 {
     RotaryData.buttonQueue = xQueueCreate(10, sizeof(ROTARY_BUTTON_TYPE));
     RotaryData.encoderQueue = xQueueCreate(10, sizeof(uint8_t));
-
-    gpio_install_isr_service(ESP_INTR_FLAG_LEVEL1);
 
     // 初始化编码器
     gpio_config_t io_conf = {};
@@ -196,9 +278,17 @@ void rotary_task(void* arg)
     io_conf.intr_type = GPIO_INTR_DISABLE;
     gpio_config(&io_conf);
 
-    // 初始化按键
+    // 初始化编码器按键
     io_conf.mode = GPIO_MODE_INPUT;
     io_conf.pin_bit_mask = BIT64(PIN_BUTTON);
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    gpio_config(&io_conf);
+
+    // 初始化普通按键
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pin_bit_mask = BIT64(PIN_KEY1);
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     io_conf.intr_type = GPIO_INTR_DISABLE;
@@ -211,16 +301,18 @@ void rotary_task(void* arg)
     RotaryButton.setClickTicks(200 / portTICK_PERIOD_MS);
     RotaryButton.setPressTicks(300 / portTICK_PERIOD_MS);
 
+    NormalButton.attachClick(NormalButtonClick);
+    NormalButton.attachDoubleClick(NormalButtonDoubleClick);
+    NormalButton.attachLongPressStart(NormalButtonLongClick);
+    NormalButton.setDebounceTicks(30 / portTICK_PERIOD_MS);
+    NormalButton.setClickTicks(200 / portTICK_PERIOD_MS);
+    NormalButton.setPressTicks(300 / portTICK_PERIOD_MS);
+
     RotarySet(0.0f, 100.f, 1.f, 1.f);
 
     // 设置中断函数
+    gpio_install_isr_service(0);
     gpio_isr_handler_add(PIN_ROTARY_A, rotary_handler, NULL);
 
-    uint8_t f;
-    while (1) {
-        if (xQueueReceive(RotaryData.encoderQueue, &f, 10 / portTICK_PERIOD_MS) == pdPASS) {
-            RotaryData.EncoderPosition = constrain(RotaryData.EncoderPosition + (f ? RotaryData.EncoderStepPosition : -RotaryData.EncoderStepPosition), RotaryData.EncoderMinPosition, RotaryData.EncoderMaxPosition);
-        }
-        RotaryButton.tick();
-    }
+    xTaskCreatePinnedToCore(rotary_task, "rotary", 1024 * 5, NULL, 5, NULL, tskNO_AFFINITY);
 }

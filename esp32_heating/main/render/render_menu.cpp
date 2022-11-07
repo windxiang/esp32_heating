@@ -32,16 +32,15 @@ void ExitMenuSystem(void)
 {
     // 过渡离开
     u8g2_SetDrawColor(&u8g2, 0);
-    Blur(0, 0, OLED_SCREEN_WIDTH, OLED_SCREEN_HEIGHT, 4, 66 * *SwitchControls[SwitchSpace_SmoothAnimation]);
+    Blur(0, 0, OLED_SCREEN_WIDTH, OLED_SCREEN_HEIGHT, 4, 66 * *SwitchControls[SwitchComponents_SmoothAnimation]);
     u8g2_SetDrawColor(&u8g2, 1);
 
     // 保存配置
     settings_write_all();
 
     // 退出菜单
-    exitMenu();
-
-    printf("退出菜单\r\n");
+    if (NULL != pHandleEventGroup)
+        xEventGroupSetBits(pHandleEventGroup, EVENT_LOGIC_MENUEXIT);
 }
 
 /**
@@ -86,7 +85,7 @@ static void MenuSmoothAnimation_System()
  * @brief 在菜单中 更新系统编码器位置
  *
  */
-static void updateRenderMenuEncoderPosition()
+static void updateRenderMenuEncoderPosition(void)
 {
     menuSystem* pMenuRoot = getCurRenderMenu(MenuControl.curRenderMenuLevelID);
 
@@ -95,8 +94,8 @@ static void updateRenderMenuEncoderPosition()
         // 设置编码器滚动范围
         pMenuRoot->minMenuSize = 0; // 重置选项最小值：从图标模式切换到列表模式会改变该值
 
-        uint8_t MinimumScrolling = min((int)SlideControls[Slide_space_Scroll].max, pMenuRoot->maxMenuSize - 1);
-        RotarySet((int)SlideControls[Slide_space_Scroll].min, MinimumScrolling + 1, 1, (int)*SlideControls[Slide_space_Scroll].val + (1)); //+(1) 是因为实际上计算会-1 ,这里要补回来
+        uint8_t MinimumScrolling = min((int)SlideControls[SlideComponents_Scroll].max, pMenuRoot->maxMenuSize - 1);
+        RotarySet((int)SlideControls[SlideComponents_Scroll].min, MinimumScrolling + 1, 1, (int)*SlideControls[SlideComponents_Scroll].val + (1)); //+(1) 是因为实际上计算会-1 ,这里要补回来
     } else {
         // 图标渲染
         subMenu* pSubMenu = getSubMenu(pMenuRoot, 0);
@@ -106,7 +105,7 @@ static void updateRenderMenuEncoderPosition()
         }
 
         RotarySet(pMenuRoot->minMenuSize, pMenuRoot->maxMenuSize - 1, 1, pMenuRoot->index);
-        *SlideControls[Slide_space_Scroll].val = 0;
+        *SlideControls[SlideComponents_Scroll].val = 0;
     }
 }
 
@@ -120,10 +119,10 @@ static void Next_Menu(void)
     updateRenderMenuEncoderPosition();
 
     // 转场动画
-    if (*SwitchControls[SwitchSpace_SmoothAnimation]) {
+    if (*SwitchControls[SwitchComponents_SmoothAnimation]) {
         if (MenuControl.LastMenuLevelId != MenuControl.curRenderMenuLevelID) {
             u8g2_SetDrawColor(&u8g2, 0);
-            Blur(0, 0, OLED_SCREEN_WIDTH, OLED_SCREEN_HEIGHT, 4, 20 * *SwitchControls[SwitchSpace_SmoothAnimation]);
+            Blur(0, 0, OLED_SCREEN_WIDTH, OLED_SCREEN_HEIGHT, 4, 20 * *SwitchControls[SwitchComponents_SmoothAnimation]);
             u8g2_SetDrawColor(&u8g2, 1);
         }
 
@@ -167,17 +166,17 @@ static void RunMenuControls(uint8_t menuID, uint8_t subMenuIndex)
             if (pSubMenu->ParamB == 0) {
                 // 头只有最差显示区域
                 pNextMenuRoot->index = 0;
-                *SlideControls[Slide_space_Scroll].val = 0;
+                *SlideControls[SlideComponents_Scroll].val = 0;
 
             } else if (pSubMenu->ParamB > 0 && pSubMenu->ParamB <= pNextMenuRoot->maxMenuSize - 1 - ExcellentMedian) {
                 // 中部拥有绝佳的显示区域
                 pNextMenuRoot->index = pSubMenu->ParamB - 1;
-                *SlideControls[Slide_space_Scroll].val = 1;
+                *SlideControls[SlideComponents_Scroll].val = 1;
 
             } else {
                 // 靠后位置 以及 最差的尾部
                 pNextMenuRoot->index = ExcellentLimit;
-                *SlideControls[Slide_space_Scroll].val = pSubMenu->ParamB - ExcellentLimit;
+                *SlideControls[SlideComponents_Scroll].val = pSubMenu->ParamB - ExcellentLimit;
             }
 
         } else {
@@ -243,7 +242,7 @@ static void RunMenuControls(uint8_t menuID, uint8_t subMenuIndex)
 
         // 背景变淡
         u8g2_SetDrawColor(&u8g2, 0);
-        Blur(0, 0, OLED_SCREEN_WIDTH, OLED_SCREEN_HEIGHT, 3, 11 * *SwitchControls[SwitchSpace_SmoothAnimation]);
+        Blur(0, 0, OLED_SCREEN_WIDTH, OLED_SCREEN_HEIGHT, 3, 11 * *SwitchControls[SwitchComponents_SmoothAnimation]);
         u8g2_SetDrawColor(&u8g2, 1);
 
         // 绘制滑动条
@@ -293,11 +292,11 @@ void RenderMenu(void)
     ClearOLEDBuffer();
 
     // 计算过渡动画
-    if (true == *SwitchControls[SwitchSpace_SmoothAnimation]) {
+    if (true == *SwitchControls[SwitchComponents_SmoothAnimation]) {
         MenuSmoothAnimation_System();
     }
 
-    const SlideBar* pSlideSpace = &SlideControls[Slide_space_Scroll];
+    const SlideBar* pSlideSpace = &SlideControls[SlideComponents_Scroll];
 
     // 分别获取 菜单层、菜单项 索引值
     menuSystem* pMenuRoot = getCurRenderMenu(MenuControl.curRenderMenuLevelID);
@@ -368,7 +367,7 @@ void RenderMenu(void)
         // 选中反色高亮被选项
         subMenu* pSubMenu = getSubMenu(pMenuRoot, iCurMenuItemIndex); // 得到当前显示的菜单
         u8g2_SetDrawColor(&u8g2, 2);
-        u8g2_DrawRBox(&u8g2, 0, ((int)*pSlideSpace->val - menuSmoothAnimation[1].result) * 16, *SwitchControls[SwitchSpace_OptionWidth] ? 123 : (u8g2_GetUTF8Width(&u8g2, pSubMenu->name.c_str()) - menuSmoothAnimation[2].result + 12 * (pSubMenu->type != Type_MenuName) + 1), CNSize + 2, 0);
+        u8g2_DrawRBox(&u8g2, 0, ((int)*pSlideSpace->val - menuSmoothAnimation[1].result) * 16, *SwitchControls[SwitchComponents_OptionWidth] ? 123 : (u8g2_GetUTF8Width(&u8g2, pSubMenu->name.c_str()) - menuSmoothAnimation[2].result + 12 * (pSubMenu->type != Type_MenuName) + 1), CNSize + 2, 0);
         u8g2_SetDrawColor(&u8g2, 1);
 
         // 刷新编码器位置
@@ -427,13 +426,13 @@ void RenderMenu(void)
     // 等待编码器按钮按下
     ROTARY_BUTTON_TYPE rotaryButton = getRotaryButton();
     switch (rotaryButton) {
-    case BUTTON_CLICK:
-    case BUTTON_DOUBLECLICK:
+    case RotaryButton_Click:
+    case RotaryButton_DoubleClick:
         // 单击 双击 执行项目
         RunMenuControls(pMenuRoot->menuID, pMenuRoot->index + *pSlideSpace->val);
         break;
 
-    case BUTTON_LONGCLICK:
+    case RotaryButton_LongClick:
         // 长按 返回上一个菜单
         RunMenuControls(pMenuRoot->menuID, 0);
         break;
@@ -443,4 +442,11 @@ void RenderMenu(void)
     }
 
     Display();
+}
+
+void startMenu(void)
+{
+    MenuControl.curRenderMenuLevelID = 0;
+    updateRenderMenuEncoderPosition();
+    rotaryResetQueue();
 }

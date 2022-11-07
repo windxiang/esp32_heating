@@ -6,19 +6,6 @@
 static const char* TAG = "nvs";
 static nvs_handle SettingsHandle = 0;
 
-typedef enum {
-    _int8,
-    _uint8,
-    _int16,
-    _uint16,
-    _int32,
-    _uint32,
-    _int64,
-    _uint64,
-    _str,
-    _float32
-} eType;
-
 /**
  * @brief 保存
  *
@@ -88,48 +75,36 @@ int settings_read_all(void)
     size_t size;
 
     // 读取菜单配置
-    nvs_get_u8(SettingsHandle, "m_Language", &SystemMenuSaveData.Language);
-    nvs_get_u8(SettingsHandle, "m_BLEState", &SystemMenuSaveData.BLEState);
-    nvs_get_u8(SettingsHandle, "m_ScreenFlip", &SystemMenuSaveData.ScreenFlip);
-    nvs_get_u8(SettingsHandle, "m_MenuListMode", &SystemMenuSaveData.MenuListMode);
-    nvs_get_u8(SettingsHandle, "m_SmoothAni", &SystemMenuSaveData.SmoothAnimationFlag);
-    nvs_get_u8(SettingsHandle, "m_Volume", &SystemMenuSaveData.Volume);
-    nvs_get_u8(SettingsHandle, "m_PanelSettings", &SystemMenuSaveData.PanelSettings);
-    nvs_get_u8(SettingsHandle, "m_OptionWidth", &SystemMenuSaveData.OptionStripFixedLength_Flag);
-    size = sizeof(SystemMenuSaveData.ScreenBrightness);
-    nvs_get_blob(SettingsHandle, "m_OLEDLight", &SystemMenuSaveData.ScreenBrightness, &size);
-    size = sizeof(SystemMenuSaveData.UndervoltageAlert);
-    nvs_get_blob(SettingsHandle, "m_UnderVoltage", &SystemMenuSaveData.UndervoltageAlert, &size);
-    size = sizeof(SystemMenuSaveData.BLEName);
-    nvs_get_str(SettingsHandle, "m_BLEName", SystemMenuSaveData.BLEName, &size);
-    size = sizeof(SystemMenuSaveData.BootPasswd);
-    nvs_get_str(SettingsHandle, "m_BootPasswd", SystemMenuSaveData.BootPasswd, &size);
+    size = sizeof(SystemMenuSaveData);
+    nvs_get_blob(SettingsHandle, "m_sys", &SystemMenuSaveData, &size);
 
     // 读取加热台T12配置参数
     int8_t count = 0;
-    nvs_get_i8(SettingsHandle, "c_curMax", &count);
-    nvs_get_i8(SettingsHandle, "c_curIndex", &HeatingConfig.curConfigIndex);
+    nvs_get_i8(SettingsHandle, "c_curMax", &count); // 全部配置个数
+    nvs_get_i8(SettingsHandle, "c_curIndex", &HeatingConfig.curConfigIndex); // 当前配置
+
     HeatingConfig.heatingConfig.clear();
+
     for (int i = 0; i < count; i++) {
         char key[32] = { 0 };
-        char name[20] = { 0 };
+        // char name[20] = { 0 };
 
-        _HeatingConfig heatingConfig = {};
+        _HeatingConfig config = {};
 
-        sprintf(key, "c_name-%d", i);
-        size = sizeof(name);
-        nvs_get_str(SettingsHandle, key, name, &size);
-        heatingConfig.name = name;
+        sprintf(key, "c_con-%d", i);
+        size = sizeof(config);
+        nvs_get_blob(SettingsHandle, key, &config, &size);
 
-        sprintf(key, "c_pid-%d", i);
-        size = sizeof(heatingConfig.PID);
-        nvs_get_blob(SettingsHandle, key, &heatingConfig.PID, &size);
+        // 添加
+        HeatingConfig.heatingConfig.push_back(config);
+    }
 
-        sprintf(key, "c_temp-%d", i);
-        size = sizeof(heatingConfig.PTemp);
-        nvs_get_blob(SettingsHandle, key, &heatingConfig.PTemp, &size);
-
-        HeatingConfig.heatingConfig.push_back(heatingConfig);
+    // 读取卡尔曼滤波参数
+    for (int i = 0; i < adc_last_max; i++) {
+        char key[32] = { 0 };
+        sprintf(key, "c_kalman-%d", i);
+        size = sizeof(KalmanInfo[i].parm);
+        nvs_get_blob(SettingsHandle, key, &KalmanInfo[i].parm, &size);
     }
 
     return 0;
@@ -143,33 +118,22 @@ int settings_write_all(void)
             return -1;
     }
 
-    nvs_set_u8(SettingsHandle, "m_Language", SystemMenuSaveData.Language);
-    nvs_set_u8(SettingsHandle, "m_BLEState", SystemMenuSaveData.BLEState);
-    nvs_set_u8(SettingsHandle, "m_ScreenFlip", SystemMenuSaveData.ScreenFlip);
-    nvs_set_u8(SettingsHandle, "m_MenuListMode", SystemMenuSaveData.MenuListMode);
-    nvs_set_u8(SettingsHandle, "m_SmoothAni", SystemMenuSaveData.SmoothAnimationFlag);
-    nvs_set_u8(SettingsHandle, "m_Volume", SystemMenuSaveData.Volume);
-    nvs_set_u8(SettingsHandle, "m_PanelSettings", SystemMenuSaveData.PanelSettings);
-    nvs_set_u8(SettingsHandle, "m_OptionWidth", SystemMenuSaveData.OptionStripFixedLength_Flag);
-    nvs_set_blob(SettingsHandle, "m_OLEDLight", (void*)&SystemMenuSaveData.ScreenBrightness, sizeof(SystemMenuSaveData.ScreenBrightness));
-    nvs_set_blob(SettingsHandle, "m_UnderVoltage", (void*)&SystemMenuSaveData.UndervoltageAlert, sizeof(SystemMenuSaveData.UndervoltageAlert));
-    nvs_set_str(SettingsHandle, "m_BLEName", SystemMenuSaveData.BLEName);
-    nvs_set_str(SettingsHandle, "m_BootPasswd", SystemMenuSaveData.BootPasswd);
+    nvs_set_blob(SettingsHandle, "m_sys", &SystemMenuSaveData, sizeof(SystemMenuSaveData));
 
     // 写入加热台T12配置参数
     nvs_set_i8(SettingsHandle, "c_curMax", HeatingConfig.heatingConfig.size());
     nvs_set_i8(SettingsHandle, "c_curIndex", HeatingConfig.curConfigIndex);
     for (int i = 0; i < HeatingConfig.heatingConfig.size(); i++) {
         char key[32] = { 0 };
+        sprintf(key, "c_con-%d", i);
+        nvs_set_blob(SettingsHandle, key, &HeatingConfig.heatingConfig[i], sizeof(HeatingConfig.heatingConfig[i]));
+    }
 
-        sprintf(key, "c_name-%d", i);
-        nvs_set_str(SettingsHandle, key, HeatingConfig.heatingConfig[i].name.c_str());
-
-        sprintf(key, "c_pid-%d", i);
-        nvs_set_blob(SettingsHandle, key, &HeatingConfig.heatingConfig[i].PID, sizeof(HeatingConfig.heatingConfig[i].PID));
-
-        sprintf(key, "c_temp-%d", i);
-        nvs_set_blob(SettingsHandle, key, &HeatingConfig.heatingConfig[i].PTemp, sizeof(HeatingConfig.heatingConfig[i].PTemp));
+    // 写入卡尔曼滤波参数
+    for (int i = 0; i < adc_last_max; i++) {
+        char key[32] = { 0 };
+        sprintf(key, "c_kalman-%d", i);
+        nvs_set_blob(SettingsHandle, key, &KalmanInfo[i].parm, sizeof(KalmanInfo[i].parm));
     }
 
     return settings_commit();

@@ -21,6 +21,10 @@ public:
     PID(double*, double*, double*, // * constructor.  links the PID to the Input, Output, and
         double, double, double, int); //   Setpoint.  Initial tuning parameters are also set here
 
+    PID(double*, double*, double*, int);
+
+    void reset(void); // 复位所有参数
+
     void SetMode(int Mode); // * sets PID to either Manual (0) or Auto (non-0)
 
     bool Compute(); // * performs the PID calculation.  it should be
@@ -56,26 +60,25 @@ public:
 private:
     void Initialize();
 
-    double dispKp; // * we'll hold on to the tuning parameters in user-entered
-    double dispKi; //   format for display purposes
-    double dispKd; //
+    double dispKp; // 原始PID设置参数 不会改变
+    double dispKi; // 原始PID设置参数
+    double dispKd; // 原始PID设置参数
 
-    double kp; // * (P)roportional Tuning Parameter
-    double ki; // * (I)ntegral Tuning Parameter
-    double kd; // * (D)erivative Tuning Parameter
+    double kp; // 计算后的PID参数 根据原始PID参数做计算
+    double ki; // 计算后的PID参数
+    double kd; // 计算后的PID参数
 
     int controllerDirection;
     int pOn;
 
-    double* myInput; // * Pointers to the Input, Output, and Setpoint variables
-    double* myOutput; //   This creates a hard link between the variables and the
-    double* mySetpoint; //   PID, freeing the user from having to constantly tell us
-                        //   what these values are.  with pointers we'll just know.
+    double* myInput; // PID输入值 (当前传感器值)
+    double* myOutput; // PID输出值 (计算结果)
+    double* mySetpoint; // PID目标值 (输入值要向目标值靠拢)
 
     TickType_t lastTime;
     double outputSum, lastInput;
 
-    TickType_t SampleTime;
+    TickType_t SampleTime; // PID采样时间 小于采样时间不进行计算
     double outMin, outMax;
     bool inAuto, pOnE;
 };

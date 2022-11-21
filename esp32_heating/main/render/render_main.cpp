@@ -73,23 +73,35 @@ uint8_t* C_table[] = { c1, c2, c3, Lightning, c5, c6, c7, c7 }; // 温度控制�
  */
 static void renderMain_Graphics(void)
 {
-    _HeatingConfig* pConfig = getCurrentHeatingConfig();
+    _HeatingConfig* pCurConfig = getCurrentHeatingConfig();
+    _HeatSystemConfig* pSystemConfig = getHeatingSystemConfig();
 
     float currentTemp = adcGetHeatingTemp(); // 当前温度
-    float destTemp = 0.0f;
-    if (TYPE_HEATING_VARIABLE == pConfig->type) {
+    float destTemp = 0.0f; // 目标温度
+    if (TYPE_HEATING_VARIABLE == pCurConfig->type) {
         if (getPIDIsStartOutput()) {
-            destTemp = CalculateTemp((xTaskGetTickCount() - getStartOutputTick()) / 1000.0f, pConfig->PTemp, NULL);
+            destTemp = CalculateTemp((xTaskGetTickCount() - getStartOutputTick()) / 1000.0f, pCurConfig->PTemp, NULL);
         }
     } else {
-        destTemp = pConfig->targetTemp;
+        destTemp = pCurConfig->targetTemp;
+    }
+
+    float minTemp = 0.0f, maxTemp = 0.0f;
+    if (pCurConfig->type == TYPE_HEATING_CONSTANT || pCurConfig->type == TYPE_HEATING_VARIABLE) {
+        // 加热台
+        minTemp = pSystemConfig->HeatMinTemp;
+        maxTemp = pSystemConfig->HeatMaxTemp;
+    } else if (pCurConfig->type == TYPE_T12) {
+        // T12
+        minTemp = pSystemConfig->T12MinTemp;
+        maxTemp = pSystemConfig->T12MaxTemp;
     }
 
     char buf[128];
 
     // 显示当前配置名称
-    if (strlen(pConfig->name) > 0) {
-        sprintf(buf, "%s:%s", pConfig->name, heatingModeStr[pConfig->type]);
+    if (strlen(pCurConfig->name) > 0) {
+        sprintf(buf, "%s:%s", pCurConfig->name, heatingModeStr[pCurConfig->type]);
         u8g2_DrawUTF8(&u8g2, 0, 1, buf);
     } else {
         u8g2_DrawUTF8(&u8g2, 0, 1, "[未知配置]");
@@ -103,12 +115,13 @@ static void renderMain_Graphics(void)
 
     /////////////////////////////////////
     // 电源电压
-    sprintf(buf, "%1.1fV", adcGetSystemVol());
+    float sysVol = adcGetSystemVol() / 1000.0f;
+    sprintf(buf, "%1.1fV", sysVol);
     u8g2_DrawUTF8(&u8g2, 0, 42, buf);
 
     // 欠压告警图标闪烁
-    float curVol = getSystemVoltage();
-    if (0.0f != adcGetSystemVol() && curVol < adcGetSystemVol()) {
+    float curVol = getSystemUndervoltageAlert();
+    if (0.0f != sysVol && curVol < sysVol) {
         if ((xTaskGetTickCount() / 1000) % 2) {
             uint32_t x = Get_UTF8_Ascii_Pix_Len(0, buf) + 2;
             Draw_Slow_Bitmap(x, 42, Battery_NoPower, 14, 14);
@@ -151,7 +164,7 @@ static void renderMain_Graphics(void)
     u8g2_DrawFrame(&u8g2, 0, 53, 103, 11);
 
     // 当前温度 条
-    u8g2_DrawBox(&u8g2, 0, 53, map(currentTemp, HeatMinTemp, HeatMaxTemp, 5, 98), 11);
+    u8g2_DrawBox(&u8g2, 0, 53, map(currentTemp, minTemp, maxTemp, 5, 98), 11);
 
     // 右边框
     u8g2_DrawFrame(&u8g2, 104, 53, 23, 11);
@@ -167,13 +180,13 @@ static void renderMain_Graphics(void)
     u8g2_SetDrawColor(&u8g2, 2);
 
     // 绘制 设定温度 图标
-    if (TYPE_HEATING_CONSTANT == pConfig->type || TYPE_T12 == pConfig->type) {
-        Draw_Slow_Bitmap(map(pConfig->targetTemp, HeatMinTemp, HeatMaxTemp, 5, 98) - 4, 54, PositioningCursor, 8, 8);
+    if (TYPE_HEATING_CONSTANT == pCurConfig->type || TYPE_T12 == pCurConfig->type) {
+        Draw_Slow_Bitmap(map(pCurConfig->targetTemp, minTemp, maxTemp, 5, 98) - 4, 54, PositioningCursor, 8, 8);
 
-    } else if (TYPE_HEATING_VARIABLE == pConfig->type) {
+    } else if (TYPE_HEATING_VARIABLE == pCurConfig->type) {
         float allTime = 0;
-        float temp = CalculateTemp((xTaskGetTickCount() - getStartOutputTick()) / 1000.0f, pConfig->PTemp, &allTime);
-        Draw_Slow_Bitmap(map(temp, HeatMinTemp, HeatMaxTemp, 5, 98) - 4, 54, PositioningCursor, 8, 8);
+        float temp = CalculateTemp((xTaskGetTickCount() - getStartOutputTick()) / 1000.0f, pCurConfig->PTemp, &allTime);
+        Draw_Slow_Bitmap(map(temp, minTemp, maxTemp, 5, 98) - 4, 54, PositioningCursor, 8, 8);
 
         // 绘制回流焊剩余时间
         if (getPIDIsStartOutput()) {
@@ -220,12 +233,12 @@ static void processKey(void)
     }
 
     // 处理编码器左右旋转
-    _HeatingConfig* pConfig = getCurrentHeatingConfig();
-    switch (pConfig->type) {
+    _HeatingConfig* pCurConfig = getCurrentHeatingConfig();
+    switch (pCurConfig->type) {
     case TYPE_HEATING_CONSTANT: // 恒温焊台
     case TYPE_T12: // T12
         // 改变温度
-        pConfig->targetTemp = GetRotaryPositon();
+        pCurConfig->targetTemp = GetRotaryPositon();
         break;
 
     case TYPE_HEATING_VARIABLE: // 回流焊
@@ -256,6 +269,10 @@ void RenerMain(void)
     case 1:
         // 详细面板
         renderMain_Detailed();
+        break;
+
+    case 2:
+        // 曲线面板
         break;
     }
 

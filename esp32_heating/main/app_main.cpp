@@ -1,3 +1,12 @@
+/**
+ * 继续参考的项目:
+ * https://oshwhub.com/z_star/pian-xie-mi-ni-jia-re-tai-V2.0
+ * https://oshwhub.com/LittleOAndLittleQ/87e303d7f7624710a0cddce77ea6bd42
+ *
+ * 还要加入
+ * WIFI WebServer等功能
+ */
+
 #include "heating.h"
 #include <stdio.h>
 #include <esp_chip_info.h>
@@ -38,6 +47,9 @@ void app_main(void)
 
     // 初始化PWM
     pwmInit();
+
+    // 蜂鸣器
+    beepInit();
 
     // SPI初始化
     max6675Init();

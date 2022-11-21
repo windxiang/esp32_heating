@@ -2,6 +2,10 @@
 #include "esp_adc_cal.h"
 #include "driver/adc.h"
 #include "stdlib.h"
+#include <math.h>
+#include "ntc.h"
+
+static const char* TAG = "ADC";
 
 /*  ESP32 ADC1 channel 与 Pin 对照表
     +----------+------------+-------+-----------------+--------------+
@@ -25,25 +29,20 @@
     +----------+------------+-------+-----------------+--------------+
 */
 
-// 这里定义的通道顺序, 要和 _enumADCTYPE 进行对应
-static esp_adc_cal_characteristics_t* adc_chars = NULL;
-
 struct _strADCInfo {
-    float ram; // adc 直接给应用层的数据
+    float originalRam; // ADC 原始数据
+    float ram; // adc 滤波后的数据
     adc1_channel_t channel; // adc 采集通道
     TickType_t lastSampleTime; // 最后一次采样时间
-    // 滤波方式
-    // 采样周期
-    //
 };
 
 static _strADCInfo strADCInfo[adc_last_max] = {
-    [adc_HeatingTemp] = { 0, ADC1_CHANNEL_MAX, 0 },
-    [adc_T12Temp] = { 0, ADC1_CHANNEL_0, 0 },
-    [adc_T12Cur] = { 0, ADC1_CHANNEL_3, 0 },
-    [adc_T12NTC] = { 0, ADC1_CHANNEL_6, 0 },
-    [adc_SystemVol] = { 0, ADC1_CHANNEL_1, 0 },
-    [adc_RoomTemp] = { 0, ADC1_CHANNEL_7, 0 },
+    [adc_HeatingTemp] = { 0, 0, ADC1_CHANNEL_MAX, 0 },
+    [adc_T12Temp] = { 0, 0, ADC1_CHANNEL_0, 0 },
+    [adc_T12Cur] = { 0, 0, ADC1_CHANNEL_3, 0 },
+    [adc_T12NTC] = { 0, 0, ADC1_CHANNEL_6, 0 },
+    [adc_SystemVol] = { 0, 0, ADC1_CHANNEL_1, 0 },
+    [adc_RoomTemp] = { 0, 0, ADC1_CHANNEL_7, 0 },
 };
 
 #define DEFAULT_VREF 1100
@@ -55,7 +54,8 @@ static _strADCInfo strADCInfo[adc_last_max] = {
  */
 float adcGetHeatingTemp(void)
 {
-    return (float)strADCInfo[adc_HeatingTemp].ram;
+    const float calibrationVal = KalmanInfo[adc_HeatingTemp].parm.calibrationVal;
+    return (float)strADCInfo[adc_HeatingTemp].ram + calibrationVal;
 }
 
 /**
@@ -65,7 +65,8 @@ float adcGetHeatingTemp(void)
  */
 float adcGetT12Temp(void)
 {
-    return (float)strADCInfo[adc_T12Temp].ram;
+    const float calibrationVal = KalmanInfo[adc_T12Temp].parm.calibrationVal;
+    return (float)strADCInfo[adc_T12Temp].ram + calibrationVal;
 }
 
 /**
@@ -75,7 +76,8 @@ float adcGetT12Temp(void)
  */
 float adcGetT12Cur(void)
 {
-    return (float)strADCInfo[adc_T12Cur].ram;
+    const float calibrationVal = KalmanInfo[adc_T12Cur].parm.calibrationVal;
+    return (float)strADCInfo[adc_T12Cur].ram + calibrationVal;
 }
 
 /**
@@ -85,7 +87,23 @@ float adcGetT12Cur(void)
  */
 float adcGetT12NTC(void)
 {
-    return (float)strADCInfo[adc_T12NTC].ram;
+    const float calibrationVal = KalmanInfo[adc_T12NTC].parm.calibrationVal;
+    return (float)strADCInfo[adc_T12NTC].ram + calibrationVal;
+}
+
+/**
+ * @brief 获取系统输入电压(mV)
+ *
+ * @return float
+ */
+float adcGetSystemVol(void)
+{
+    const float up = 10.0f * 1000.0f;
+    const float down = 1.0f * 1000.0f;
+    const float calibrationVal = KalmanInfo[adc_SystemVol].parm.calibrationVal;
+
+    uint32_t voltage = strADCInfo[adc_SystemVol].ram * (down + up) / down;
+    return voltage + calibrationVal;
 }
 
 /**
@@ -95,50 +113,73 @@ float adcGetT12NTC(void)
  */
 float adcGetRoomNTCTemp(void)
 {
-    return (float)strADCInfo[adc_RoomTemp].ram;
-}
+    const float calibrationVal = KalmanInfo[adc_RoomTemp].parm.calibrationVal;
+    const float R0 = 10 * 1000; // R0电阻阻值
+    const float Rn = 10 * 1000; // Rntc电阻阻值
+    const float Tn = 25.0f; // Tn - nominal temperature in Celsius.
+    const float B = 3950.0f; // B - b-value of a thermistor.
 
-/**
- * @brief 获取系统电压
- *
- * @return float
- */
-float adcGetSystemVol(void)
-{
-    return (float)strADCInfo[adc_SystemVol].ram;
+    const float temp = strADCInfo[adc_RoomTemp].ram; // ADC 采集的电压值mV
+
+    // printf("采集 %f %f \n", temp, calibrationVal);
+
+    NTC_Thermistor thermistor(R0, Rn, Tn, B, 4.98f * 1000.0f);
+    const double celsius = thermistor.readCelsius(temp);
+    return celsius + calibrationVal;
 }
 
 //检查 TP两点校准值、Vref参考电压值 是否被刻录到eFuse中
 static void check_efuse(void)
 {
-    //检查 TP两点校准值 是否被刻录到eFuse中（TP两点校准值是用户自己测量，并刻录到eFuse中）
+    // 检查 TP两点校准值 是否被刻录到eFuse中（TP两点校准值是用户自己测量，并刻录到eFuse中）
     esp_err_t eFuse_TP = esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_TP);
 
-    //检查 Vref参考电压值 是否被刻录到eFuse中（eFuse Vref由工厂生产时刻录，一般默认用这种方式校准）
+    // 检查 Vref参考电压值 是否被刻录到eFuse中（eFuse Vref由工厂生产时刻录，一般默认用这种方式校准）
     esp_err_t eFuse_Vref = esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_VREF);
 
     if (eFuse_TP == ESP_OK) {
-        printf("eFuse Two Point: Supported\n");
+        ESP_LOGI(TAG, "eFuse Two Point: Supported\n");
     } else {
-        printf("eFuse Two Point: NOT supported\n");
+        ESP_LOGI(TAG, "eFuse Two Point: NOT supported\n");
     }
 
     if (eFuse_Vref == ESP_OK) {
-        printf("eFuse Vref: Supported\n");
+        ESP_LOGI(TAG, "eFuse Vref: Supported\n");
     } else {
-        printf("eFuse Vref: NOT supported\n");
+        ESP_LOGI(TAG, "eFuse Vref: NOT supported\n");
     }
 }
 
-//打印校准类型
-static void print_char_val_type(esp_adc_cal_value_t val_type)
+static esp_adc_cal_characteristics_t adc1_chars;
+// static esp_adc_cal_characteristics_t adc2_chars; 此通道目前没用
+static bool cali_enable = false;
+
+/**
+ * @brief 得到ADC的校准值
+ *
+ * @param width
+ * @return true
+ * @return false
+ */
+static void adc_calibration_init(adc_atten_t atten, adc_bits_width_t width)
 {
-    if (val_type == ESP_ADC_CAL_VAL_EFUSE_TP) {
-        printf("Characterized using Two Point Value\n");
-    } else if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF) {
-        printf("Characterized using eFuse Vref\n");
+    cali_enable = false;
+
+    esp_err_t ret = esp_adc_cal_check_efuse(ESP_ADC_CAL_VAL_EFUSE_VREF);
+    if (ret == ESP_ERR_NOT_SUPPORTED) {
+        ESP_LOGI(TAG, "Calibration scheme not supported, skip software calibration");
+
+    } else if (ret == ESP_ERR_INVALID_VERSION) {
+        ESP_LOGI(TAG, "eFuse not burnt, skip software calibration");
+
+    } else if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "eFuse Vref: Supported\n");
+
+        cali_enable = true;
+        esp_adc_cal_characterize(ADC_UNIT_1, atten, width, 0, &adc1_chars);
+        // esp_adc_cal_characterize(ADC_UNIT_2, atten, width, 0, &adc2_chars);
     } else {
-        printf("Characterized using Default Vref\n");
+        ESP_LOGE(TAG, "Invalid arg");
     }
 }
 
@@ -168,10 +209,6 @@ static void print_char_val_type(esp_adc_cal_value_t val_type)
 /**
  * @brief  ADC1及输入通道初始化（在特定衰减下表征ADC的特性，并生成ADC电压曲线）
  *      - 支持函数重载，支持输入不定数目的通道参数，ESP32-ADC1通道数目最大值为8，总参数数目为 3~10。
- *        例：
- *          adc1_init_with_calibrate(ADC_ATTEN_DB_0, 1, ADC_CHANNEL_6);
- *          adc1_init_with_calibrate(ADC_ATTEN_DB_11, 1, ADC_CHANNEL_6);
- *          adc1_init_with_calibrate(ADC_ATTEN_DB_11, 2, ADC_CHANNEL_6, ADC_CHANNEL_7);
  *      - 由于ADC2不能与WIFI共用，所以尽量优先使用ADC1，且ADC2的读取方式与ADC1不同，也就没有在esayIO中提供ADC2的初始化和读取函数
  *      - 默认设置ADC转换数据宽度为12Bit，0~4095。（几乎不需要更改，需要更改的情况一般是改为8Bit来缩小RAM占用。但ESP32的ADC不支持8Bit，最低9Bit）
  *
@@ -183,10 +220,8 @@ static void print_char_val_type(esp_adc_cal_value_t val_type)
  *      - none
  *
  */
-void adc1_init_with_calibrate(adc_atten_t atten)
+void adc1_init_with_calibrate(adc_atten_t atten, adc_bits_width_t width)
 {
-    adc_bits_width_t width = ADC_WIDTH_BIT_12; // ADC转换数据宽度为12Bit
-
     // 检查 TP两点校准值、Vref，是否被刻录到eFuse中（一般出厂后eFuse中仅有Vref）
     check_efuse();
 
@@ -199,18 +234,8 @@ void adc1_init_with_calibrate(adc_atten_t atten)
         adc1_config_channel_atten(strADCInfo[i].channel, atten);
     }
 
-    // 申请一段内存，用于存储 esp_adc_cal_characteristics_t 校准参数结构体
-    adc_chars = (esp_adc_cal_characteristics_t*)calloc(1, sizeof(esp_adc_cal_characteristics_t));
-    if (NULL != adc_chars) {
-        // 在特定衰减下表征ADC的特性，并生成ADC电压曲线，之后调用esp_adc_cal_raw_to_voltage可对转换值进行校准补偿。并返回选用的校准方式：eFuse TP两点、eFuse Vref或 default referenc
-        esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, atten, width, DEFAULT_VREF, adc_chars);
-        // 打印最终使用的校准类型
-        print_char_val_type(val_type);
-    }
+    adc_calibration_init(atten, width);
 }
-
-//获取ADC1通道x转换后的原始值
-// adc1_get_raw(ADC_CHANNEL_6);
 
 /**
  * @brief  获取ADC1通道x，经多重采样平均后，并校准补偿后的转换电压，单位mV
@@ -230,19 +255,32 @@ uint32_t adc1_cal_get_voltage_mul(adc1_channel_t channel, uint32_t mul_num)
         adc_reading += adc1_get_raw(channel);
     }
     adc_reading /= mul_num;
-    return esp_adc_cal_raw_to_voltage(adc_reading, adc_chars);
+
+    if (cali_enable) {
+        return esp_adc_cal_raw_to_voltage(adc_reading, &adc1_chars);
+    }
+    return adc_reading;
 }
 
-static void processADC(TickType_t now)
+/**
+ * @brief 读取ESP32 ADC数据
+ *
+ */
+static void processADC()
 {
     // 读取ADC数据
     for (int i = 1; i < adc_last_max; i++) {
         _KalmanInfo* pKalmanInfo = &KalmanInfo[i];
+
+        TickType_t now = xTaskGetTickCount();
         TickType_t timeChange = (now - strADCInfo[i].lastSampleTime);
 
         if (timeChange >= pKalmanInfo->parm.Cycle) {
             // 进行采样
-            float val = (float)adc1_cal_get_voltage_mul(strADCInfo[i].channel, 2) + pKalmanInfo->parm.TempCompenstation;
+            float val = (float)adc1_cal_get_voltage_mul(strADCInfo[i].channel, 10);
+
+            // 原始数据
+            strADCInfo[i].originalRam = val;
 
             // 卡尔曼滤波
             if (pKalmanInfo->parm.UseKalman) {
@@ -255,8 +293,14 @@ static void processADC(TickType_t now)
     }
 }
 
-static void processMAX6675(TickType_t now)
+/**
+ * @brief 读取SPI MAX6675数据
+ *
+ * @param now
+ */
+static void processMAX6675(void)
 {
+    TickType_t now = xTaskGetTickCount();
     _KalmanInfo* pKalmanInfo = &KalmanInfo[0];
     _strADCInfo* pADCInfo = &strADCInfo[0];
 
@@ -264,9 +308,12 @@ static void processMAX6675(TickType_t now)
 
     if (timeChange >= pKalmanInfo->parm.Cycle) {
         // 进行采样
-        // float val = MAX6675ReadCelsius() + pKalmanInfo->parm.TempCompenstation;
-        float val = 0; // TODO Debug
+        // float val = MAX6675ReadCelsius();
+        float val = 0;
         if (val != -100.0f) {
+            // 原始数据
+            pADCInfo->originalRam = val;
+
             // 卡尔曼滤波
             if (pKalmanInfo->parm.UseKalman) {
                 val = kalmanFilter(pKalmanInfo, val);
@@ -279,27 +326,44 @@ static void processMAX6675(TickType_t now)
 }
 
 /**
- * @brief 编码器线程初始化
+ * @brief ADC线程采集任务
  *
  * @param arg
  */
 static void adc_task(void* arg)
 {
     while (1) {
-        TickType_t now = xTaskGetTickCount();
-
         // 读取SPI数据
-        processMAX6675(now);
+        processMAX6675();
 
         // 读取ADC数据
-        processADC(now);
+        processADC();
 
         delay(1);
     }
 }
 
+/**
+ * @brief 打印出所有ADC内容
+ *
+ * @param argc
+ * @param argv
+ * @return int
+ */
+static int do_dumpadc_cmd(int argc, char** argv)
+{
+    printf("加热台:%1.1f℃ 室温:%1.1f℃ 电压:%1.1fmV\n", adcGetHeatingTemp(), adcGetRoomNTCTemp(), adcGetSystemVol());
+    return 0;
+}
+
+/**
+ * @brief 初始化ADC
+ *
+ */
 void adcInit(void)
 {
-    adc1_init_with_calibrate(ADC_ATTEN_DB_11);
+    adc1_init_with_calibrate(ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12);
     xTaskCreatePinnedToCore(adc_task, "adc", 1024 * 5, NULL, 5, NULL, tskNO_AFFINITY);
+
+    register_cmd("dumpadc", "打印出所有ADC数据", NULL, do_dumpadc_cmd, NULL);
 }

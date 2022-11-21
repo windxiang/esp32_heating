@@ -7,6 +7,7 @@ static _strLogic logicController {
     pwmIsLock : _PWM_UnLock,
     pwmOutStatus : _PWM_STOP,
     lastOperationKeyTick : 0,
+    startOutputTick : 0,
 };
 
 /**
@@ -49,6 +50,7 @@ static void switchPWMStatus(void)
     if (_PWM_UnLock == logicController.pwmIsLock) {
         if (_PWM_START == logicController.pwmOutStatus) {
             logicController.pwmOutStatus = _PWM_STOP;
+
         } else {
             // 可以开始输出
             logicController.pwmOutStatus = _PWM_START;
@@ -80,8 +82,16 @@ static void enterMain(void)
     logicController.pwmIsLock = _PWM_UnLock;
     logicController.pwmOutStatus = _PWM_STOP;
 
-    _HeatingConfig* pConfig = getCurrentHeatingConfig();
-    RotarySet(HeatMinTemp, HeatMaxTemp, 1, pConfig->targetTemp);
+    _HeatingConfig* pCurConfig = getCurrentHeatingConfig();
+    _HeatSystemConfig* pSystemConfig = getHeatingSystemConfig();
+    if (pCurConfig->type == TYPE_HEATING_VARIABLE || pCurConfig->type == TYPE_HEATING_CONSTANT) {
+        // 加热台 回流焊
+        RotarySet(pSystemConfig->HeatMinTemp, pSystemConfig->HeatMaxTemp, 1, pCurConfig->targetTemp);
+    } else {
+        // T12
+        RotarySet(pSystemConfig->T12MinTemp, pSystemConfig->T12MaxTemp, 1, pCurConfig->targetTemp);
+    }
+
     rotaryResetQueue();
 }
 
@@ -160,6 +170,8 @@ static void processScreenSavers(void)
  */
 static void logic_task(void* arg)
 {
+    SetSound(BeepSoundBoot, false);
+
     while (1) {
         // 事件处理
         EventBits_t uxBitsToWaitFor = EVENT_LOGIC_MENUEXIT | EVENT_LOGIC_MENUENTER | EVENT_LOGIC_KEYUPDATE | EVENT_LOGIC_HEATING;

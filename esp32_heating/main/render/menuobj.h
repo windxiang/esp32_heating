@@ -7,22 +7,23 @@
 // 加热台 相关
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// 卡尔曼滤波配置
+// 卡尔曼滤波计算
 typedef struct
 {
     float LastP; // 上次估算协方差 初始化值为0.02
     float Now_P; // 当前估算协方差 初始化值为0
     float out; // 卡尔曼滤波器输出 初始化值为0
     float Kg; // 卡尔曼增益 初始化值为0
-} _KalmanFilter; // Kalman Filter parameter
+} _KalmanFilter;
 
+// 卡尔曼滤波参数 可以在菜单里面进行设置
 typedef struct {
     uint8_t UseKalman; // 使用卡尔曼
     float Cycle; // ADC采样周期(ms)
-    float TempCompenstation; // 温度补偿
+    float calibrationVal; // 校准补偿
     float KalmanQ; // 过程噪声协方差
     float KalmanR; // 观测噪声协方差
-} _KalmanParm; // 卡尔曼滤波参数
+} _KalmanParm;
 
 typedef struct {
     _KalmanFilter filter;
@@ -32,6 +33,21 @@ typedef struct {
 extern _KalmanInfo KalmanInfo[];
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @brief 加热台的系统配置
+ *
+ */
+struct _HeatSystemConfig {
+    float HeatMinTemp; // 加热台最小温度
+    float HeatMaxTemp; // 加热台最大温度
+    float T12MinTemp; // T12最小温度
+    float T12MaxTemp; // T12最大温度
+    float T12IdleTime; // T12降温时间(s)
+    float T12IdleTemp; // T12降温温度
+    float T12StopTime; // T12停机时间(s)
+};
+
 /**
  * @brief 加热台 T12类型配置
  *
@@ -63,10 +79,25 @@ struct _HeatingConfig {
 struct _HeatingSystem {
     int8_t maxConfig; // 最大配置
     int8_t curConfigIndex; // 当前使用配置索引
+    _HeatSystemConfig systemConfig; // 系统配置
     _HeatingConfig curConfig; // 当前使用的配置参数
     std::vector<_HeatingConfig> heatingConfig; // 子配置
 };
 extern _HeatingSystem HeatingConfig;
+
+/**
+ * @brief 回流焊曲线定义
+ *
+ */
+enum _ReflowSolder {
+    WarmUpRampRate = 0, // 预热区 升温斜率
+    WarmUpTemp, // 预热区 温度(摄氏度)
+    WarmUpTime, // 预热区 时间(s)
+    RefloatRampRate, // 回流区 升温斜率
+    RefloatTemp, // 回流区 温度(摄氏度)
+    RefloatTime, // 回流区 时间(s)
+    CoolDownTime, // 降温斜率
+};
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 系统菜单
@@ -87,6 +118,7 @@ struct _SystemMenuSaveData {
     uint8_t OptionStripFixedLength_Flag; // 选项条固定 自适应
     float ScreenProtectorTime; // 屏保在休眠后的触发时间 (秒)
     float ScreenBrightness; // 屏幕亮度
+    float SystemVolage; // 系统电压设置(mV)
     float UndervoltageAlert; // 系统电压 欠压警告阈值 (单位V)
     char BLEName[20]; // 蓝牙设备名称
     char BootPasswd[20]; // 开机密码
@@ -128,24 +160,27 @@ enum SwitchComponents_Obj {
  */
 enum SlideComponents_Obj {
     ///////////////////////////////////////////////
+    // 系统配置
     SlideComponents_ScreenBrightness, // 屏幕亮度
-    SlideComponents_UndervoltageAlert, // 欠压提醒
+    SlideComponents_SystemVoltage, // 电压设置(mV)
+    SlideComponents_UndervoltageAlert, // 欠压提醒(V)
     SlideComponents_Scroll, // 文本渲染模式下使用 每页显示4个条目 中的第几条
+    SlideComponents_ScreenProtectorTime, // 屏保触发(秒)
     ///////////////////////////////////////////////
 
-    SlideComponents_ShutdownTime, // 停机触发(分)
-    SlideComponents_ScreenProtectorTime, // 屏保触发(秒)
+    // 加热台 T12 配置
 
+    // 其他设置
     SlideComponents_TargetTemp, // 恒温模式目标输出温度(°C)
 
     // 温度曲线
-    SlideComponents_PTemp_0, // 预热区升温斜率
-    SlideComponents_PTemp_1, // 预热区温度(摄氏度)
-    SlideComponents_PTemp_2, // 预热区维持时间(秒)
-    SlideComponents_PTemp_3, // 回流区升温斜率
-    SlideComponents_PTemp_4, // 回流区温度(摄氏度)
-    SlideComponents_PTemp_5, // 回流区维持时间(秒)
-    SlideComponents_PTemp_6, // 降温斜率
+    SlideComponents_PTemp_WarmUpRampRate, // 预热区 升温斜率
+    SlideComponents_PTemp_WarmUpTemp, // 预热区 温度(摄氏度)
+    SlideComponents_PTemp_WarmUpTime, // 预热区 维持时间(秒)
+    SlideComponents_PTemp_RefloatRampRate, // 回流区 升温斜率
+    SlideComponents_PTemp_RefloatTemp, // 回流区 温度(摄氏度)
+    SlideComponents_PTemp_RefloatTime, // 回流区 维持时间(秒)
+    SlideComponents_PTemp_CoolDownTime, // 降温斜率
 
     // PID参数
     SlideComponents_PIDSample, // PID采样时间
@@ -187,6 +222,16 @@ enum SlideComponents_Obj {
     SlideComponents_TempComp_6, // 温度补偿
     SlideComponents_KFP_Q6, // 过程噪声协方差
     SlideComponents_KFP_R6, // 观察噪声协方差
+
+    // 最小 最大温度值
+    SlideComponents_HeatMinTemp, // 加热台最小最大温度
+    SlideComponents_HeatMaxTemp,
+    SlideComponents_T12MinTemp, // T12最小最大温度
+    SlideComponents_T12MaxTemp,
+    // T12保护设置
+    SlideComponents_IdleTime, // T12降温时间(s)
+    SlideComponents_IdleTemp, // T12降温温度
+    SlideComponents_StopTime, // T12停机时间(s)
 };
 
 // 滑动菜单结构体
@@ -278,10 +323,13 @@ extern "C" {
 void initMenuSystem(void);
 menuSystem* getCurRenderMenu(int menuID);
 subMenu* getSubMenu(menuSystem* pMenuRoot, int id);
+_HeatSystemConfig* getHeatingSystemConfig(void);
 _HeatingConfig* getCurrentHeatingConfig(void);
 float getScreenProtectorTime(void);
+float getSystemUndervoltageAlert(void);
 float getSystemVoltage(void);
 uint8_t getBlueToolsStatus(void);
+uint8_t getVolume(void);
 
 #ifdef __cplusplus
 }

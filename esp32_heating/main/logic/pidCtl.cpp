@@ -23,11 +23,11 @@ static PID MyPID(&pidParm.pidCurTemp, &pidParm.pidCurOutput, &pidParm.pidTargetT
  */
 void startPID(void)
 {
-    _HeatingConfig* pConfig = getCurrentHeatingConfig();
+    _HeatingConfig* pCurConfig = getCurrentHeatingConfig();
 
     MyPID.SetOutputLimits(0, 100); // PID输出限幅
     MyPID.SetMode(AUTOMATIC); // PID控制模式
-    MyPID.SetSampleTime(pConfig->PIDSample); // 设置采样时间
+    MyPID.SetSampleTime(pCurConfig->PIDSample); // 设置采样时间
     MyPID.reset(); // 复位参数
 }
 
@@ -48,45 +48,45 @@ double getPIDOutput(void)
  */
 static void startPIDLogic(void)
 {
-    _HeatingConfig* pConfig = getCurrentHeatingConfig();
+    _HeatingConfig* pCurConfig = getCurrentHeatingConfig();
 
     // 当前温度
     pidParm.pidCurTemp = adcGetHeatingTemp();
 
     // PID参数设定
-    if (pidParm.pidCurTemp < pConfig->PIDTemp) {
+    if (pidParm.pidCurTemp < pCurConfig->PIDTemp) {
         // 远PID
-        MyPID.SetTunings(pConfig->PID[0][0], pConfig->PID[0][1], pConfig->PID[0][2]);
+        MyPID.SetTunings(pCurConfig->PID[0][0], pCurConfig->PID[0][1], pCurConfig->PID[0][2]);
     } else {
         // 近PID
-        MyPID.SetTunings(pConfig->PID[1][0], pConfig->PID[1][1], pConfig->PID[1][2]);
+        MyPID.SetTunings(pCurConfig->PID[1][0], pCurConfig->PID[1][1], pCurConfig->PID[1][2]);
     }
 
     // 计算输出目标值
-    if (TYPE_HEATING_CONSTANT == pConfig->type) {
+    if (TYPE_HEATING_CONSTANT == pCurConfig->type) {
         // 恒温焊台模式
-        pidParm.pidTargetTemp = pConfig->targetTemp;
+        pidParm.pidTargetTemp = pCurConfig->targetTemp;
 
-    } else if (TYPE_HEATING_VARIABLE == pConfig->type) {
+    } else if (TYPE_HEATING_VARIABLE == pCurConfig->type) {
         // 回流焊模式
-        pidParm.pidTargetTemp = CalculateTemp((xTaskGetTickCount() - getStartOutputTick()) / 1000.0f, pConfig->PTemp, NULL);
+        pidParm.pidTargetTemp = CalculateTemp((xTaskGetTickCount() - getStartOutputTick()) / 1000.0f, pCurConfig->PTemp, NULL);
 
-    } else if (TYPE_T12 == pConfig->type) {
+    } else if (TYPE_T12 == pCurConfig->type) {
         // T12
-        pidParm.pidTargetTemp = pConfig->targetTemp;
+        pidParm.pidTargetTemp = pCurConfig->targetTemp;
     }
 
     // PID采样周期
-    MyPID.SetSampleTime(pConfig->PIDSample);
+    MyPID.SetSampleTime(pCurConfig->PIDSample);
 
     // 计算PID输出
     MyPID.Compute();
 
     // 输出
-    if (TYPE_HEATING_CONSTANT == pConfig->type || TYPE_HEATING_VARIABLE == pConfig->type) {
+    if (TYPE_HEATING_CONSTANT == pCurConfig->type || TYPE_HEATING_VARIABLE == pCurConfig->type) {
         pwmOutput(_TYPE_HEAT, pidParm.pidCurOutput);
 
-    } else if (TYPE_T12 == pConfig->type) {
+    } else if (TYPE_T12 == pCurConfig->type) {
         pwmOutput(_TYPE_T12, pidParm.pidCurOutput);
     }
 

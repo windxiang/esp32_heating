@@ -11,17 +11,6 @@ u8g2_t u8g2 = {};
 static const char* TAG = "u8g2_hal";
 static i2c_cmd_handle_t handle_i2c = NULL; // I2C handle.
 
-#ifndef OLED_ERROR_CHECK
-#define OLED_ERROR_CHECK(x)                        \
-    do {                                           \
-        esp_err_t rc = (x);                        \
-        if (rc != ESP_OK) {                        \
-            ESP_LOGE("err", "esp_err_t = %d", rc); \
-            assert(0 && #x);                       \
-        }                                          \
-    } while (0);
-#endif
-
 uint8_t u8g2_esp32_i2c_byte_cb(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* arg_ptr)
 {
     switch (msg) {
@@ -39,7 +28,7 @@ uint8_t u8g2_esp32_i2c_byte_cb(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void*
         ESP_LOG_BUFFER_HEXDUMP(TAG, data_ptr, arg_int, ESP_LOG_VERBOSE);
 
         while (arg_int > 0) {
-            OLED_ERROR_CHECK(i2c_master_write_byte(handle_i2c, *data_ptr, ACK_CHECK_EN));
+            i2c_master_write_byte(handle_i2c, *data_ptr, ACK_CHECK_EN);
             data_ptr++;
             arg_int--;
         }
@@ -49,14 +38,14 @@ uint8_t u8g2_esp32_i2c_byte_cb(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void*
     case U8X8_MSG_BYTE_START_TRANSFER: {
         uint8_t i2c_address = u8x8_GetI2CAddress(u8x8);
         handle_i2c = i2c_cmd_link_create();
-        OLED_ERROR_CHECK(i2c_master_start(handle_i2c));
-        OLED_ERROR_CHECK(i2c_master_write_byte(handle_i2c, i2c_address | I2C_MASTER_WRITE, ACK_CHECK_EN));
+        i2c_master_start(handle_i2c);
+        i2c_master_write_byte(handle_i2c, i2c_address | I2C_MASTER_WRITE, ACK_CHECK_EN);
         break;
     }
 
     case U8X8_MSG_BYTE_END_TRANSFER: {
-        OLED_ERROR_CHECK(i2c_master_stop(handle_i2c));
-        OLED_ERROR_CHECK(i2c_master_cmd_begin(I2C_NUM, handle_i2c, I2C_TIMEOUT_MS / portTICK_RATE_MS));
+        i2c_master_stop(handle_i2c);
+        i2c_master_cmd_begin(I2C_NUM, handle_i2c, I2C_TIMEOUT_MS / portTICK_RATE_MS);
         i2c_cmd_link_delete(handle_i2c);
         break;
     }

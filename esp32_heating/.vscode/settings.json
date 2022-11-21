@@ -26,7 +26,10 @@
         "list": "cpp",
         "xhash": "cpp",
         "system_error": "cpp",
-        "xlocale": "cpp"
+        "xlocale": "cpp",
+        "utility": "cpp",
+        "xtr1common": "cpp",
+        "iosfwd": "cpp"
     },
     "idf.portWin": "COM7"
 }

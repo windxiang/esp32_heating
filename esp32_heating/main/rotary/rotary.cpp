@@ -63,6 +63,8 @@ static void IRAM_ATTR rotary_handler(void* arg)
                 xQueueSendFromISR(RotaryData.encoderQueue, &f, &xHigherPriorityTaskWoken);
             }
             RotaryData.ab = (a == b);
+
+            SetSound(BeepSoundRotaryAB, true);
         }
     }
 }
@@ -75,10 +77,10 @@ static void IRAM_ATTR rotary_handler(void* arg)
 static void RotaryButtonClick(void)
 {
     if (NULL != RotaryData.buttonQueue) {
-        // SetSound(Beep1);
         ROTARY_BUTTON_TYPE f = RotaryButton_Click;
         xQueueSend(RotaryData.buttonQueue, &f, 0);
         sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
+        SetSound(BeepSoundClick, false);
     }
 }
 
@@ -89,10 +91,10 @@ static void RotaryButtonClick(void)
 static void RotaryButtonLongClick(void)
 {
     if (NULL != RotaryData.buttonQueue) {
-        // SetSound(Beep1);
         ROTARY_BUTTON_TYPE f = RotaryButton_LongClick;
         xQueueSend(RotaryData.buttonQueue, &f, 0);
         sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
+        SetSound(BeepSoundLongClick, false);
     }
 }
 
@@ -103,10 +105,10 @@ static void RotaryButtonLongClick(void)
 static void RotaryButtonDoubleClick(void)
 {
     if (NULL != RotaryData.buttonQueue) {
-        // SetSound(Beep1);
         ROTARY_BUTTON_TYPE f = RotaryButton_DoubleClick;
         xQueueSend(RotaryData.buttonQueue, &f, 0);
         sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
+        SetSound(BeepSoundDoubleClick, false);
     }
 }
 
@@ -118,10 +120,10 @@ static void RotaryButtonDoubleClick(void)
 static void NormalButtonClick(void)
 {
     if (NULL != RotaryData.buttonQueue) {
-        // SetSound(Beep1);
         ROTARY_BUTTON_TYPE f = NormalButton_Click;
         xQueueSend(RotaryData.buttonQueue, &f, 0);
         sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
+        SetSound(BeepSoundClick, false);
     }
 }
 
@@ -132,10 +134,10 @@ static void NormalButtonClick(void)
 static void NormalButtonLongClick(void)
 {
     if (NULL != RotaryData.buttonQueue) {
-        // SetSound(Beep1);
         ROTARY_BUTTON_TYPE f = NormalButton_LongClick;
         xQueueSend(RotaryData.buttonQueue, &f, 0);
         sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
+        SetSound(BeepSoundLongClick, false);
     }
 }
 
@@ -146,10 +148,10 @@ static void NormalButtonLongClick(void)
 static void NormalButtonDoubleClick(void)
 {
     if (NULL != RotaryData.buttonQueue) {
-        // SetSound(Beep1);
         ROTARY_BUTTON_TYPE f = NormalButton_DoubleClick;
         xQueueSend(RotaryData.buttonQueue, &f, 0);
         sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
+        SetSound(BeepSoundDoubleClick, false);
     }
 }
 

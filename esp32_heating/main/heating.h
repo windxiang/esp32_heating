@@ -42,6 +42,9 @@
 // ADC
 #include "adc.h"
 
+// 蜂鸣器
+#include "beep.h"
+
 #ifndef constrain
 #define constrain(amt, low, high) ((amt) <= (low) ? (low) : ((amt) >= (high) ? (high) : (amt)))
 #endif // constrain
@@ -92,9 +95,11 @@
 #define SCREEN_FONT_ROW 4
 #define CNSize 12
 
-// 温度限制
-#define HeatMaxTemp 300 // 最大温度值
-#define HeatMinTemp 0 // 最小温度值
+#define I2C_NUM I2C_NUM_0 // IIC使用接口
+#define OLED_FREQ (1000 * 1000) // IIC频率
+#define OLED_I2C_PIN_SCL GPIO_NUM_21 // IIC SCL IO
+#define OLED_I2C_PIN_SDA GPIO_NUM_22 // IIC SDA IO
+#define I2C_TIMEOUT_MS (100)
 
 // ADC类型定义
 enum _enumADCTYPE {

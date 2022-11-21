@@ -78,6 +78,10 @@ int settings_read_all(void)
     size = sizeof(SystemMenuSaveData);
     nvs_get_blob(SettingsHandle, "m_sys", &SystemMenuSaveData, &size);
 
+    // 读取加热台T12系统配置
+    size = sizeof(HeatingConfig.systemConfig);
+    nvs_get_blob(SettingsHandle, "h_sys", &HeatingConfig.systemConfig, &size);
+
     // 读取加热台T12配置参数
     int8_t count = 0;
     nvs_get_i8(SettingsHandle, "c_curMax", &count); // 全部配置个数
@@ -119,6 +123,9 @@ int settings_write_all(void)
     }
 
     nvs_set_blob(SettingsHandle, "m_sys", &SystemMenuSaveData, sizeof(SystemMenuSaveData));
+
+    // 写入加热台T12系统配置
+    nvs_set_blob(SettingsHandle, "h_sys", &HeatingConfig.systemConfig, sizeof(HeatingConfig.systemConfig));
 
     // 写入加热台T12配置参数
     nvs_set_i8(SettingsHandle, "c_curMax", HeatingConfig.heatingConfig.size());

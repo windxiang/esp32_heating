@@ -95,9 +95,8 @@ void ClearOLEDBuffer(void)
 
 void Display(void)
 {
-    // PlaySoundLoop();
-    u8g2_SendBuffer(&u8g2);
     delay(1);
+    u8g2_SendBuffer(&u8g2);
 }
 
 /**

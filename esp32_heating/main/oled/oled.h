@@ -20,12 +20,6 @@ extern "C" {
 #define ACK_VAL (i2c_ack_type_t)0 /*!< I2C ack value */
 #define NACK_VAL (i2c_ack_type_t)1 /*!< I2C nack value */
 
-#define I2C_NUM I2C_NUM_0 // IIC使用接口
-#define OLED_FREQ (1000 * 1000) // IIC频率
-#define OLED_I2C_PIN_SCL GPIO_NUM_21 // IIC SCL IO
-#define OLED_I2C_PIN_SDA GPIO_NUM_22 // IIC SDA IO
-#define I2C_TIMEOUT_MS (100)
-
 extern u8g2_t u8g2;
 
 void oled_init(int sda_io_num, int scl_io_num, uint32_t freqHZ, i2c_mode_t mode);

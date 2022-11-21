@@ -13,6 +13,7 @@ enum _PWMTYPE {
     _TYPE_MAX,
 };
 
+bool beepOutput(uint32_t freq);
 bool pwmOutput(_PWMTYPE type, uint16_t value);
 void pwmInit(void);
 

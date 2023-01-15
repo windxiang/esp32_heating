@@ -58,7 +58,7 @@ inline float NTC_Thermistor::resistanceToKelvins(const float resistance)
 /**
  * @brief 根据ADC电压值 计算NTC阻值
  *
- * @param voltage
+ * @param voltage ADC采集的电压
  * @return float
  */
 inline float NTC_Thermistor::readResistance(float voltage)

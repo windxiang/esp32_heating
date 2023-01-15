@@ -2,8 +2,8 @@
  * 继续参考的项目:
  * https://oshwhub.com/z_star/pian-xie-mi-ni-jia-re-tai-V2.0
  * https://oshwhub.com/LittleOAndLittleQ/87e303d7f7624710a0cddce77ea6bd42
- *
- * 还要加入
+ * https://oshwhub.com/littleoandlittleq/bian-xie-jia-re-tai
+ * 加入调试输出串口
  * WIFI WebServer等功能
  */
 
@@ -53,6 +53,9 @@ void app_main(void)
 
     // SPI初始化
     max6675Init();
+
+    // T12 初始化
+    t12Init();
 
     // 创建任务
     pHandleEventGroup = xEventGroupCreate();

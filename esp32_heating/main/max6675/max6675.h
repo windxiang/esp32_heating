@@ -6,7 +6,7 @@ extern "C" {
 
 void max6675Init(void);
 float MAX6675ReadFahrenheit(void);
-float MAX6675ReadCelsius(void);
+bool MAX6675ReadCelsius(float* pTemp);
 
 #ifdef __cplusplus
 }

@@ -6,7 +6,7 @@ extern "C" {
 
 // PWM 输出控制类型
 enum _PWMTYPE {
-    _TYPE_T12,
+    // _TYPE_T12, // T12 使用GPIO自行控制
     _TYPE_FAN,
     _TYPE_HEAT,
     _TYPE_BEEP,

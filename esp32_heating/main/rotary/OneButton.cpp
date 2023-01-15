@@ -70,7 +70,7 @@ void OneButton::attachClick(callbackFunction newFunction)
 } // attachClick
 
 // save function for parameterized click event
-void OneButton::attachClick(parameterizedCallbackFunction newFunction, void* parameter)
+void OneButton::attachClick(parameterizedCallbackFunction newFunction, uint32_t parameter)
 {
     _paramClickFunc = newFunction;
     _clickFuncParam = parameter;
@@ -89,7 +89,7 @@ void OneButton::attachDoubleClick(callbackFunction newFunction)
     _maxClicks = std::max(_maxClicks, 2);
 }
 
-void OneButton::attachDoubleClick(parameterizedCallbackFunction newFunction, void* parameter)
+void OneButton::attachDoubleClick(parameterizedCallbackFunction newFunction, uint32_t parameter)
 {
     _paramDoubleClickFunc = newFunction;
     _doubleClickFuncParam = parameter;
@@ -109,7 +109,7 @@ void OneButton::attachMultiClick(callbackFunction newFunction)
     _maxClicks = std::max(_maxClicks, 100);
 }
 
-void OneButton::attachMultiClick(parameterizedCallbackFunction newFunction, void* parameter)
+void OneButton::attachMultiClick(parameterizedCallbackFunction newFunction, uint32_t parameter)
 {
     _paramMultiClickFunc = newFunction;
     _multiClickFuncParam = parameter;
@@ -127,7 +127,7 @@ void OneButton::attachLongPressStart(callbackFunction newFunction)
     _longPressStartFunc = newFunction;
 }
 
-void OneButton::attachLongPressStart(parameterizedCallbackFunction newFunction, void* parameter)
+void OneButton::attachLongPressStart(parameterizedCallbackFunction newFunction, uint32_t parameter)
 {
     _paramLongPressStartFunc = newFunction;
     _longPressStartFuncParam = parameter;
@@ -146,7 +146,7 @@ void OneButton::attachLongPressStop(callbackFunction newFunction)
     _longPressStopFunc = newFunction;
 }
 
-void OneButton::attachLongPressStop(parameterizedCallbackFunction newFunction, void* parameter)
+void OneButton::attachLongPressStop(parameterizedCallbackFunction newFunction, uint32_t parameter)
 {
     _paramLongPressStopFunc = newFunction;
     _longPressStopFuncParam = parameter;
@@ -164,7 +164,7 @@ void OneButton::attachDuringLongPress(callbackFunction newFunction)
     _duringLongPressFunc = newFunction;
 }
 
-void OneButton::attachDuringLongPress(parameterizedCallbackFunction newFunction, void* parameter)
+void OneButton::attachDuringLongPress(parameterizedCallbackFunction newFunction, uint32_t parameter)
 {
     _paramDuringLongPressFunc = newFunction;
     _duringLongPressFuncParam = parameter;

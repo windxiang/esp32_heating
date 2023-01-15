@@ -6,12 +6,18 @@ extern "C" {
 
 typedef enum {
     BUTTON_NULL = 0, // 无
+    // 编码器
     RotaryButton_Click = 1, // 编码器按键-单击
     RotaryButton_LongClick, // 编码器按键-长按
     RotaryButton_DoubleClick, // 编码器按键-双击
-    NormalButton_Click,
-    NormalButton_LongClick,
-    NormalButton_DoubleClick,
+    // 按键1
+    NormalButton1_Click,
+    NormalButton1_LongClick,
+    NormalButton1_DoubleClick,
+    // 按键2
+    NormalButton2_Click,
+    NormalButton2_LongClick,
+    NormalButton2_DoubleClick,
 } ROTARY_BUTTON_TYPE;
 
 void RotarySet(float min, float max, float step, float position);

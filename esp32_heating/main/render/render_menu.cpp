@@ -1,5 +1,4 @@
 #include "heating.h"
-#include "ExternDraw.h"
 #include "bitmap.h"
 
 // static const char* TAG = "render_task";
@@ -444,6 +443,10 @@ void RenderMenu(void)
     Display();
 }
 
+/**
+ * @brief 启动菜单初始化
+ *
+ */
 void startMenu(void)
 {
     MenuControl.curRenderMenuLevelID = 0;

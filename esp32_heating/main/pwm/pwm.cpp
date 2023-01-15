@@ -3,7 +3,7 @@
 #include <math.h>
 #include "argtable3/argtable3.h"
 
-#define DUTYRESOLUTION1 LEDC_TIMER_12_BIT // 分辨率 最大12位
+#define DUTYRESOLUTION1 LEDC_TIMER_12_BIT // 分辨率
 #define DUTYRESOLUTION2 LEDC_TIMER_14_BIT
 
 static const ledc_timer_config_t pwmTimer[] = {
@@ -11,7 +11,7 @@ static const ledc_timer_config_t pwmTimer[] = {
         .speed_mode = LEDC_HIGH_SPEED_MODE, // timer mode
         .duty_resolution = DUTYRESOLUTION1, // resolution of PWM duty
         .timer_num = LEDC_TIMER_0, // timer index
-        .freq_hz = 5 * 1000, // frequency of PWM signal
+        .freq_hz = 10, // frequency of PWM signal
         .clk_cfg = LEDC_AUTO_CLK, // Auto select the source clock
     },
     // 用于BEEP 修改freq
@@ -26,18 +26,18 @@ static const ledc_timer_config_t pwmTimer[] = {
 
 static const ledc_channel_config_t pwm_channel[_TYPE_MAX] = {
     // PWM T12
-    [_TYPE_T12] = {
-        .gpio_num = PIN_PWM_T12,
-        .speed_mode = LEDC_HIGH_SPEED_MODE,
-        .channel = LEDC_CHANNEL_0,
-        .intr_type = LEDC_INTR_DISABLE,
-        .timer_sel = LEDC_TIMER_0,
-        .duty = 0,
-        .hpoint = 0,
-        .flags = {
-            .output_invert = 0,
-        },
-    },
+    // [_TYPE_T12] = {
+    //     .gpio_num = PIN_PWM_T12,
+    //     .speed_mode = LEDC_HIGH_SPEED_MODE,
+    //     .channel = LEDC_CHANNEL_0,
+    //     .intr_type = LEDC_INTR_DISABLE,
+    //     .timer_sel = LEDC_TIMER_0,
+    //     .duty = 0,
+    //     .hpoint = 0,
+    //     .flags = {
+    //         .output_invert = 0,
+    //     },
+    // },
     // PWM 风扇
     [_TYPE_FAN] = {
         .gpio_num = PIN_PWM_FAN,

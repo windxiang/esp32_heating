@@ -30,6 +30,7 @@ extern uint8_t Set15[];
 extern uint8_t Set16[];
 extern uint8_t Set17[];
 extern uint8_t Set18[];
+extern uint8_t SetTrend[];
 extern uint8_t Lang_CN[];
 extern uint8_t Lang_EN[];
 extern uint8_t Lang_JP[];

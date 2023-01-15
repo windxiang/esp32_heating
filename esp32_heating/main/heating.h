@@ -17,6 +17,8 @@
 // 渲染
 #include "u8g2.h"
 #include "menuobj.h"
+#include "ExternDraw.h"
+#include "menuexpand.h"
 
 // 工具
 #include "mathFun.h"
@@ -45,6 +47,9 @@
 // 蜂鸣器
 #include "beep.h"
 
+// T12
+#include "t12.h"
+
 #ifndef constrain
 #define constrain(amt, low, high) ((amt) <= (low) ? (low) : ((amt) >= (high) ? (high) : (amt)))
 #endif // constrain
@@ -57,14 +62,19 @@
 #define min(amt, low) ((amt) <= (low) ? (amt) : (low))
 #endif
 
-// 一些硬件上的定义
+#ifndef max
+#define max(x, y) ((x) > (y) ? (x) : (y))
+#endif
+
+// 按键和编码器
 #define PIN_ROTARY_A GPIO_NUM_27 // 编码器
 #define PIN_ROTARY_B GPIO_NUM_14 // 编码器
 #define PIN_BUTTON GPIO_NUM_33 // 编码器按键
 #define PIN_KEY1 GPIO_NUM_4 // 按键1
+#define PIN_KEY2 GPIO_NUM_15 // 按键2
 
 // PWM 输出GPIO配置
-#define PIN_PWM_T12 15
+#define PIN_PWM_T12 GPIO_NUM_2
 #define PIN_PWM_FAN 12
 #define PIN_PWM_HEAT 26
 #define PIN_PWM_BEEP 25
@@ -80,13 +90,14 @@
 
 // ADC 采集
 #define PIN_ADC_T12_TEMP 36 // ADC1_CH0 SENSOR_VP
+#define PIN_ADC_VCC 37 // ADC1_CH1 SENSOR_CAPP
+#define PIN_ADC_REF 38 // ADC1_CH2 SENSOR_CAPN
 #define PIN_ADC_T12_CUR 39 // ADC1_CH3 SENSOR_VN
 #define PIN_ADC_T12_NTC 34 // ADC1_CH6 VDET_1
-#define PIN_ADC_VCC 37 // ADC1_CH1 SENSOR_CAPP
 #define PIN_ADC_NTC_ROOM 35 // ADC1_CH7 VDET_2
 
 // T12
-#define PIN_T12_SLEEP 13 // GPIO
+#define PIN_T12_SLEEP GPIO_NUM_13 // GPIO T12休眠检测
 
 // OLED相关
 #define OLED_SCREEN_WIDTH 128 // OLED 宽度
@@ -104,10 +115,11 @@
 // ADC类型定义
 enum _enumADCTYPE {
     adc_HeatingTemp = 0, // 加热台温度 SPI读取芯片
-    adc_T12Temp, // T12 温度
-    adc_T12Cur, // T12
-    adc_T12NTC, // T12
-    adc_SystemVol, // 系统电压
+    adc_T12Temp, // T12 烙铁头温度
+    adc_T12Cur, // T12 电流
+    adc_T12NTC, // T12 NTC温度
+    adc_SystemVol, // 系统输入电压
+    adc_SystemRef, // 系统5V电压
     adc_RoomTemp, // 环境温度
     adc_last_max // 放在末尾
 };
@@ -119,7 +131,7 @@ extern EventGroupHandle_t pHandleEventGroup;
 enum _logic_event_type {
     EVENT_LOGIC_MENUEXIT = 1 << 0, // 退出菜单
     EVENT_LOGIC_MENUENTER = 1 << 1, // 进入菜单
-    EVENT_LOGIC_KEYUPDATE = 1 << 2, // 按键事件
+    EVENT_LOGIC_KEYUP = 1 << 2, // 按键事件
     EVENT_LOGIC_HEATING = 1 << 3, // 事件 开始加热 停止加热
 };
 

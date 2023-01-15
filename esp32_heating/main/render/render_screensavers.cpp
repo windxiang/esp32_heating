@@ -1,5 +1,4 @@
 #include "heating.h"
-#include "ExternDraw.h"
 #include <math.h>
 
 // https://github.com/ArduboyCollection/arduboy-moire

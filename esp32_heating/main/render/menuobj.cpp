@@ -1,7 +1,7 @@
 #include "heating.h"
 #include "bitmap.h"
-#include "ExternDraw.h"
 #include <string.h>
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 菜单相关变量
 
@@ -12,12 +12,11 @@ _SystemMenuSaveData SystemMenuSaveData = {
     MenuListMode : 0, // true:菜单使用文本渲染方式 不使用图标、 false:混合显示模式
     SmoothAnimationFlag : 1, // 菜单动画标志位
     Volume : 1, // 编码器声音设置
-    PanelSettings : PANELSET_Simple, // 面板设置 详细面板 简约面板
+    PanelSettings : PANELSET_Simple, // 首页设置 详细面板 简约面板
     OptionStripFixedLength_Flag : 0, // 选项条固定 自适应
 
     ScreenProtectorTime : 60.0f, // 屏保在休眠后的触发时间 (秒)
     ScreenBrightness : 128.0f, // 屏幕亮度
-    SystemVolage : 4980, // 系统电压设置(mV)
     UndervoltageAlert : 18.0f, // 系统电压 欠压警告阈值 (单位V)
 
     BLEName : { 'H', 'e', 'a', 't', 'i', 'n', 'g' }, // 蓝牙设备名称
@@ -27,54 +26,6 @@ _SystemMenuSaveData SystemMenuSaveData = {
 static float MenuScroll = 0; // 当前菜单的位置
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// 各模块相关变量
-
-_HeatingSystem HeatingConfig = {
-    maxConfig : 10, // 最大配置数量
-    curConfigIndex : -1, // 当前使用配置索引
-    systemConfig : {
-        HeatMinTemp : 0.0f,
-        HeatMaxTemp : 0.0f,
-        T12MinTemp : 0.0f,
-        T12MaxTemp : 0.0f,
-        T12IdleTime : 30.0f,
-        T12IdleTemp : 150.0f,
-        T12StopTime : 120.0f,
-    }, // 系统配置
-    curConfig : {}, // 当前使用的配置参数
-    heatingConfig : {},
-};
-
-// 卡尔曼滤波配置
-_KalmanInfo KalmanInfo[adc_last_max] = {
-    [adc_HeatingTemp] = {
-        .filter = { 0.02, 0, 0, 0 },
-        .parm = { 1, 100, 0, 0.1f, 0.1f },
-    },
-    [adc_T12Temp] = {
-        .filter = { 0.02, 0, 0, 0 },
-        .parm = { 1, 100, 0, 0.1f, 0.1f },
-    },
-    [adc_T12Cur] = {
-        .filter = { 0.02, 0, 0, 0 },
-        .parm = { 1, 100, 0, 0.1f, 0.1f },
-    },
-    [adc_T12NTC] = {
-        .filter = { 0.02, 0, 0, 0 },
-        .parm = { 1, 100, 0, 0.1f, 0.1f },
-    },
-    [adc_SystemVol] = {
-        .filter = { 0.02, 0, 0, 0 },
-        .parm = { 1, 100, 0, 0.1f, 0.1f },
-    },
-    [adc_RoomTemp] = {
-        .filter = { 0.02, 0, 0, 0 },
-        .parm = { 1, 100, 0, 0.1f, 0.1f },
-    },
-};
-
-// T12 震动开关检测配置
-uint8_t HandleTrigger = HANDLETRIGGER_VibrationSwitch;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void ExitMenuSystem(void);
@@ -82,14 +33,6 @@ void BLE_Restart(void);
 void BLE_Rename(void);
 void SetPasswd(void);
 void About(void);
-
-void newHeatConfig(void);
-void JumpWithTitle(void);
-void PopMsg_ListMode(void);
-void loadHeatConfig(void);
-
-void renameHeatConfig(void);
-void delHeatConfig(void);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -104,7 +47,7 @@ uint8_t* SwitchControls[] = {
     &SystemMenuSaveData.MenuListMode, // 图标模式 列表模式
     &SystemMenuSaveData.SmoothAnimationFlag, // 过度动画标志位
     &SystemMenuSaveData.Volume, // 声音设置
-    &SystemMenuSaveData.PanelSettings, // 面板设置 详细面板 简约面板
+    &SystemMenuSaveData.PanelSettings, // 首页设置 详细面板 简约面板
     &SystemMenuSaveData.OptionStripFixedLength_Flag, // 选项条固定 自适应
     // &RotaryDirection, // 编码器反向
 
@@ -121,6 +64,7 @@ uint8_t* SwitchControls[] = {
     (uint8_t*)&KalmanInfo[adc_T12Cur].parm.UseKalman, // 卡尔曼滤波开关
     (uint8_t*)&KalmanInfo[adc_T12NTC].parm.UseKalman, // 卡尔曼滤波开关
     (uint8_t*)&KalmanInfo[adc_SystemVol].parm.UseKalman, // 卡尔曼滤波开关
+    (uint8_t*)&KalmanInfo[adc_SystemRef].parm.UseKalman, // 卡尔曼滤波开关
     (uint8_t*)&KalmanInfo[adc_RoomTemp].parm.UseKalman, // 卡尔曼滤波开关
 };
 
@@ -132,7 +76,6 @@ struct SlideBar SlideControls[] = {
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // 系统配置
     { (float*)&SystemMenuSaveData.ScreenBrightness, 0, 255, 5 }, // 屏幕亮度
-    { (float*)&SystemMenuSaveData.SystemVolage, 0, 5200, 10 }, // 电压设置(mV)
     { (float*)&SystemMenuSaveData.UndervoltageAlert, 0, 36, 0.25 }, // 欠压提醒(V)
     { (float*)&MenuScroll, 0, OLED_SCREEN_HEIGHT / 16, 1 }, // 当前菜单显示的位置（每页只显示4个，所以范围在0~3） 高度为16像素
     { (float*)&SystemMenuSaveData.ScreenProtectorTime, 0, 600, 1 }, // 屏保在休眠后的触发时间 (秒)
@@ -161,16 +104,12 @@ struct SlideBar SlideControls[] = {
     { (float*)&HeatingConfig.curConfig.PID[1][2], 0, 10, 0.01 }, // D
 
     // 卡尔曼滤波设置
-    { (float*)&KalmanInfo[adc_HeatingTemp].parm.Cycle, 10, 1000, 1 }, { (float*)&KalmanInfo[adc_HeatingTemp].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_HeatingTemp].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_HeatingTemp].parm.KalmanR, 0, 10, 0.01 },
-
+    { (float*)&KalmanInfo[adc_HeatingTemp].parm.Cycle, 180, 1000, 1 }, { (float*)&KalmanInfo[adc_HeatingTemp].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_HeatingTemp].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_HeatingTemp].parm.KalmanR, 0, 10, 0.01 },
     { (float*)&KalmanInfo[adc_T12Temp].parm.Cycle, 10, 1000, 1 }, { (float*)&KalmanInfo[adc_T12Temp].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_T12Temp].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_T12Temp].parm.KalmanR, 0, 10, 0.01 },
-
     { (float*)&KalmanInfo[adc_T12Cur].parm.Cycle, 10, 1000, 1 }, { (float*)&KalmanInfo[adc_T12Cur].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_T12Cur].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_T12Cur].parm.KalmanR, 0, 10, 0.01 },
-
     { (float*)&KalmanInfo[adc_T12NTC].parm.Cycle, 10, 1000, 1 }, { (float*)&KalmanInfo[adc_T12NTC].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_T12NTC].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_T12NTC].parm.KalmanR, 0, 10, 0.01 },
-
     { (float*)&KalmanInfo[adc_SystemVol].parm.Cycle, 10, 1000, 1 }, { (float*)&KalmanInfo[adc_SystemVol].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_SystemVol].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_SystemVol].parm.KalmanR, 0, 10, 0.01 },
-
+    { (float*)&KalmanInfo[adc_SystemRef].parm.Cycle, 10, 1000, 1 }, { (float*)&KalmanInfo[adc_SystemRef].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_SystemRef].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_SystemRef].parm.KalmanR, 0, 10, 0.01 },
     { (float*)&KalmanInfo[adc_RoomTemp].parm.Cycle, 10, 1000, 1 }, { (float*)&KalmanInfo[adc_RoomTemp].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_RoomTemp].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_RoomTemp].parm.KalmanR, 0, 10, 0.01 },
 
     // 最小 最大温度值
@@ -306,233 +245,11 @@ void About(void)
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/**
- * @brief 加载加热台当前配置
- *
- * @return true
- * @return false
- */
-bool loadHeatDefConfig(int8_t index)
-{
-    if (0 <= index && index < HeatingConfig.heatingConfig.size()) {
-        HeatingConfig.curConfigIndex = index;
-        memcpy((void*)&HeatingConfig.curConfig, (void*)&HeatingConfig.heatingConfig[index], sizeof(HeatingConfig.curConfig));
-        return true;
-    }
-    return false;
-}
-
-/**
- * @brief 刷新加热台配置列表
- *
- */
-void flushHeatConfig(void)
-{
-    menuSystem* pMenuRoot = getCurRenderMenu(210);
-    if (NULL != pMenuRoot) {
-        // 删除旧的菜单
-        int size = pMenuRoot->subSystem.size();
-
-        for (int i = 1; i < size; i++) {
-            pMenuRoot->subSystem.pop_back();
-        }
-
-        subMenu _subMenu = {
-            type : Type_CheckBox,
-            name : "",
-            icon : NULL,
-            ParamA : SwitchComponents_CurConfigIndex,
-            ParamB : 0,
-            function : *JumpWithTitle,
-        };
-
-        // 添加菜单
-        for (int i = 0; i < HeatingConfig.heatingConfig.size(); i++) {
-            _subMenu.name = HeatingConfig.heatingConfig[i].name;
-            _subMenu.ParamB = i;
-            pMenuRoot->subSystem.push_back(_subMenu);
-        }
-
-        // 刷新个数
-        pMenuRoot->maxMenuSize = pMenuRoot->subSystem.size();
-    }
-}
-
-/**
- * @brief 新建一个配置
- *
- * @param pName 配置名称
- */
-static void _newHeatConfig(const char* pName)
-{
-    _HeatingConfig config = {};
-    strncpy(config.name, pName, sizeof(config.name));
-
-    // 模式配置
-    config.type = TYPE_HEATING_CONSTANT;
-
-    // 回流焊配置
-    config.PTemp[0] = 2.0f; // 升温斜率
-    config.PTemp[1] = 120.0f; // 预热区温度(摄氏度)
-    config.PTemp[2] = 100.0f; // 预热区时间(秒)
-    config.PTemp[3] = 1.0f; // 升温斜率
-    config.PTemp[4] = 250.0f; // 回流区温度(摄氏度)
-    config.PTemp[5] = 60.0f; // 回流区时间(秒)
-    config.PTemp[6] = 3.0f; // 降温斜率
-
-    // 恒温模式目标输出温度(°C)
-    config.targetTemp = 280.0f;
-
-    // PID采样时间
-    config.PIDSample = 100.0f;
-
-    // PID切换温度
-    config.PIDTemp = 10.0f; // 相差10度时开始切换
-
-    // 爬升期 PID
-    config.PID[0][0] = 2.0f;
-    config.PID[0][1] = 0.2f;
-    config.PID[0][2] = 1.0f;
-    // 接近期 PID
-    config.PID[1][0] = 1.0f;
-    config.PID[1][1] = 0.05f;
-    config.PID[1][2] = 0.25f;
-
-    ////////////////////////
-    // 添加
-    HeatingConfig.heatingConfig.push_back(config);
-
-    // 选择新建的配置
-    HeatingConfig.curConfigIndex = HeatingConfig.heatingConfig.size() - 1;
-    if (loadHeatDefConfig(HeatingConfig.curConfigIndex)) {
-        printf("初始化默认配置成功 %d %s\n", HeatingConfig.curConfigIndex, HeatingConfig.curConfig.name);
-    }
-}
-
-/**
- * @brief 新建加热台配置
- *
- */
-void newHeatConfig(void)
-{
-    if (HeatingConfig.heatingConfig.size() < HeatingConfig.maxConfig) {
-        char name[20];
-        snprintf(name, sizeof(name), "heating-%d", HeatingConfig.heatingConfig.size());
-        TextEditor("[输入配置名]", name, sizeof(name));
-
-        if (strlen(name) > 0) {
-            _newHeatConfig(name);
-
-            if (loadHeatDefConfig(HeatingConfig.curConfigIndex)) {
-                PopWindows("新建成功");
-            }
-        }
-
-    } else {
-        PopWindows("超过最大配置限制");
-    }
-}
-
-/**
- * @brief 载入烙铁头配置
- *
- */
-void loadHeatConfig(void)
-{
-    char name[128];
-    if (loadHeatDefConfig(HeatingConfig.curConfigIndex)) {
-        // 提示
-        snprintf(name, sizeof(name), "载入[%s]成功", HeatingConfig.curConfig.name);
-        PopWindows(name);
-    } else {
-        snprintf(name, sizeof(name), "载入失败");
-        PopWindows(name);
-    }
-}
-
-/**
- * @brief 初始化最小最大温度值
- *
- */
-void flushMaxTemp(void)
-{
-    if (HeatingConfig.curConfig.type == TYPE_HEATING_VARIABLE || HeatingConfig.curConfig.type == TYPE_HEATING_CONSTANT) {
-        // 加热台 回流焊
-        SlideControls[SlideComponents_TargetTemp].max = HeatingConfig.systemConfig.HeatMaxTemp;
-        SlideControls[SlideComponents_PTemp_WarmUpTemp].max = HeatingConfig.systemConfig.HeatMaxTemp;
-        SlideControls[SlideComponents_PTemp_RefloatTemp].max = HeatingConfig.systemConfig.HeatMaxTemp;
-    } else {
-        // T12
-        SlideControls[SlideComponents_TargetTemp].max = HeatingConfig.systemConfig.T12MaxTemp;
-    }
-}
-
-/**
- * @brief 保存当前配置数据到原始位置
- *
- */
-void saveCurrentHeatData(void)
-{
-    if (-1 != HeatingConfig.curConfigIndex && HeatingConfig.curConfigIndex < HeatingConfig.heatingConfig.size()) {
-        memcpy((void*)&HeatingConfig.heatingConfig[HeatingConfig.curConfigIndex], (void*)&HeatingConfig.curConfig, sizeof(HeatingConfig.curConfig));
-        flushMaxTemp();
-    }
-}
-
-/**
- * @brief 重命名当前的配置
- *
- */
-void renameHeatConfig(void)
-{
-    if (-1 != HeatingConfig.curConfigIndex && HeatingConfig.curConfigIndex < HeatingConfig.heatingConfig.size()) {
-        char name[20] = { 0 };
-        strncpy(name, HeatingConfig.heatingConfig[HeatingConfig.curConfigIndex].name, sizeof(name));
-        TextEditor("[重命名配置]", name, sizeof(name));
-
-        if (strlen(name) > 0) {
-            strncpy(HeatingConfig.heatingConfig[HeatingConfig.curConfigIndex].name, name, sizeof(HeatingConfig.heatingConfig[HeatingConfig.curConfigIndex].name));
-            PopWindows("重命名成功");
-        }
-    } else {
-        PopWindows("未选择配置");
-    }
-}
-
-/**
- * @brief 删除配置
- *
- */
-void delHeatConfig(void)
-{
-    if (-1 == HeatingConfig.curConfigIndex || HeatingConfig.curConfigIndex >= HeatingConfig.heatingConfig.size()) {
-        PopWindows("配置选择错误");
-
-    } else if (1 < HeatingConfig.heatingConfig.size()) {
-        // 删除
-        HeatingConfig.heatingConfig.erase(HeatingConfig.heatingConfig.begin() + HeatingConfig.curConfigIndex, HeatingConfig.heatingConfig.begin() + HeatingConfig.curConfigIndex + 1);
-
-        PopWindows("删除成功");
-
-        // 选择第0个配置
-        HeatingConfig.curConfigIndex = 0;
-
-        // 加载新配置
-        loadHeatConfig();
-
-    } else if (1 == HeatingConfig.heatingConfig.size()) {
-        PopWindows("最后一个配置 无法删除");
-
-    } else {
-        PopWindows("未知错误");
-    }
-}
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 static std::vector<menuSystem> menuInfo = {
     // 菜单入口
     { 0, 0, 0, 0, MenuRenderText, {
-                                      { Type_MenuName, "[加热台设置]", NULL, 0, 0, *ExitMenuSystem },
+                                      { Type_MenuName, "[设置]", NULL, 0, 0, *ExitMenuSystem },
                                       { Type_GotoMenu, "温度设置", NULL, 200, 0, NULL },
                                       { Type_GotoMenu, "系统设置", NULL, 100, 0, NULL },
                                       { Type_RunFunction, "返回", NULL, 0, 0, *ExitMenuSystem },
@@ -574,14 +291,13 @@ static std::vector<menuSystem> menuInfo = {
 
     { 104, 0, 0, 0, MenuRenderImage, {
                                          { Type_MenuName, "电压设置", NULL, 100, 3, NULL },
-                                         { Type_Slider, "5V电压(mV)", Set6, SlideComponents_SystemVoltage, 0, NULL },
                                          { Type_Slider, "欠压提醒(V)", Set6, SlideComponents_UndervoltageAlert, 0, NULL },
                                      } },
     /////////////////////////////////////////////////////
     // 三级菜单
     { 110, 0, 0, 0, MenuRenderImage, {
                                          { Type_MenuName, "显示效果", NULL, 101, 1, NULL },
-                                         { Type_GotoMenu, "面板设置", Set0, 112, 0, NULL },
+                                         { Type_GotoMenu, "首页设置", Set0, 112, 0, NULL },
                                          { Type_Switch, "翻转屏幕", IMG_Flip, SwitchComponents_ScreenFlip, 0, *updateOledFlip },
                                          { Type_GotoMenu, "过渡动画", IMG_Animation, 113, 0, NULL },
                                          { Type_Slider, "屏幕亮度", IMG_Sun, SlideComponents_ScreenBrightness, 1, *updateOledLight },
@@ -598,9 +314,10 @@ static std::vector<menuSystem> menuInfo = {
                                      } },
 
     { 112, 0, 0, 0, MenuRenderImage, {
-                                         { Type_MenuName, "面板设置", NULL, 110, 1, NULL },
-                                         { Type_CheckBox, "简约", Set17, SwitchComponents_PanelSettings, 0, *JumpWithTitle },
-                                         { Type_CheckBox, "详细", Set18, SwitchComponents_PanelSettings, 1, *JumpWithTitle },
+                                         { Type_MenuName, "首页设置", NULL, 110, 1, NULL },
+                                         { Type_CheckBox, "详细", Set17, SwitchComponents_PanelSettings, 0, *JumpWithTitle },
+                                         { Type_CheckBox, "精简", Set18, SwitchComponents_PanelSettings, 1, *JumpWithTitle },
+                                         { Type_CheckBox, "曲线", SetTrend, SwitchComponents_PanelSettings, 2, *JumpWithTitle },
                                      } },
 
     { 113, 0, 0, 0, MenuRenderImage, {
@@ -691,12 +408,20 @@ static std::vector<menuSystem> menuInfo = {
                                         { Type_Slider, "观察噪声协方差", NULL, SlideComponents_KFP_R5, 0, NULL },
                                         { Type_MenuName, "----------", NULL, 200, 2, NULL },
 
-                                        // 环境温度
-                                        { Type_Switch, "环境温度-状态", NULL, SwitchComponents_KFP6, 0, NULL },
+                                        // 5V电压
+                                        { Type_Switch, "5V电压-状态", NULL, SwitchComponents_KFP6, 0, NULL },
                                         { Type_Slider, "采样周期(ms)", NULL, SlideComponents_ADC_Cycle6, 0, NULL },
                                         { Type_Slider, "温度补偿", NULL, SlideComponents_TempComp_6, 0, NULL },
                                         { Type_Slider, "过程噪声协方差", NULL, SlideComponents_KFP_Q6, 0, NULL },
                                         { Type_Slider, "观察噪声协方差", NULL, SlideComponents_KFP_R6, 0, NULL },
+                                        { Type_MenuName, "----------", NULL, 200, 2, NULL },
+
+                                        // 环境温度
+                                        { Type_Switch, "环境温度-状态", NULL, SwitchComponents_KFP7, 0, NULL },
+                                        { Type_Slider, "采样周期(ms)", NULL, SlideComponents_ADC_Cycle7, 0, NULL },
+                                        { Type_Slider, "温度补偿", NULL, SlideComponents_TempComp_7, 0, NULL },
+                                        { Type_Slider, "过程噪声协方差", NULL, SlideComponents_KFP_Q7, 0, NULL },
+                                        { Type_Slider, "观察噪声协方差", NULL, SlideComponents_KFP_R7, 0, NULL },
                                         { Type_MenuName, "----------", NULL, 200, 2, NULL },
                                         { Type_ReturnMenu, "返回", NULL, 200, 2, NULL },
                                     } },
@@ -838,7 +563,7 @@ static int do_dumpmenu_cmd(int argc, char** argv)
 
     printf("----- dump menu -----\n");
     printf("语言:%d 蓝牙状态:%d 屏幕翻转:%d 渲染方式:%d 动画标志:%d\n", SystemMenuSaveData.Language, SystemMenuSaveData.BLEState, SystemMenuSaveData.ScreenFlip, SystemMenuSaveData.MenuListMode, SystemMenuSaveData.SmoothAnimationFlag);
-    printf("音量:%d 面板设置:%d 固定方式:%d 屏幕亮度:%1.1f 欠压提醒:%1.1f\n", SystemMenuSaveData.Volume, SystemMenuSaveData.PanelSettings, SystemMenuSaveData.OptionStripFixedLength_Flag, SystemMenuSaveData.ScreenBrightness, SystemMenuSaveData.UndervoltageAlert);
+    printf("音量:%d 首页设置:%d 固定方式:%d 屏幕亮度:%1.1f 欠压提醒:%1.1f\n", SystemMenuSaveData.Volume, SystemMenuSaveData.PanelSettings, SystemMenuSaveData.OptionStripFixedLength_Flag, SystemMenuSaveData.ScreenBrightness, SystemMenuSaveData.UndervoltageAlert);
     printf("屏保时间:%1.0f\n", SystemMenuSaveData.ScreenProtectorTime);
     printf("蓝牙名称:%s 密码:%s\n", SystemMenuSaveData.BLEName, SystemMenuSaveData.BootPasswd);
 
@@ -880,36 +605,11 @@ void initMenuSystem(void)
     // 初始化是否镜像显示
     updateOledFlip();
 
-    // 只有一个配置的话 就新建
-    if (0 == HeatingConfig.heatingConfig.size()) {
-        _newHeatConfig("defConfig");
-        settings_write_all();
-    } else {
-        loadHeatDefConfig(HeatingConfig.curConfigIndex);
-    }
+    // 初始化扩展菜单
+    initMenuExpand();
 
     // 初始化shell命令
     register_cmd("dumpmenu", "打印出所有菜单内容", NULL, do_dumpmenu_cmd, NULL);
-}
-
-/**
- * @brief 获取加热台温度配置
- *
- * @return _HeatingSystem
- */
-_HeatSystemConfig* getHeatingSystemConfig(void)
-{
-    return &HeatingConfig.systemConfig;
-}
-
-/**
- * @brief 获得当前的加热台配置
- *
- * @return _HeatingConfig
- */
-_HeatingConfig* getCurrentHeatingConfig(void)
-{
-    return &HeatingConfig.curConfig;
 }
 
 /**
@@ -930,16 +630,6 @@ float getScreenProtectorTime(void)
 float getSystemUndervoltageAlert(void)
 {
     return SystemMenuSaveData.UndervoltageAlert;
-}
-
-/**
- * @brief 获取系统电压设置
- *
- * @return float
- */
-float getSystemVoltage(void)
-{
-    return SystemMenuSaveData.SystemVolage;
 }
 
 /**

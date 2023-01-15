@@ -33,20 +33,25 @@ static void update_timer_callback(TimerHandle_t timer)
 /**
  * @brief 读取摄氏度
  *
- * @return float
+ * @return bool
  */
-float MAX6675ReadCelsius(void)
+bool MAX6675ReadCelsius(float* pTemp)
 {
+    if (pTemp == NULL) {
+        return false;
+    }
+    *pTemp = 0;
+
     uint16_t data = 0;
 
     spi_transaction_t trans = {};
-    trans.tx_buffer = NULL,
-    trans.rx_buffer = &data,
-    trans.length = 16,
-    trans.rxlength = 16,
+    trans.tx_buffer = NULL;
+    trans.rx_buffer = &data;
+    trans.length = 16;
+    trans.rxlength = 16;
 
-    gpio_set_level(PIN_MAX6675_SPI_CS, 0);
-    delay(1);
+    // gpio_set_level(PIN_MAX6675_SPI_CS, 0);
+    // delay(1);
 
     spi_device_acquire_bus(SPIDeviceHandle, portMAX_DELAY);
     spi_device_transmit(SPIDeviceHandle, &trans);
@@ -54,17 +59,19 @@ float MAX6675ReadCelsius(void)
 
     uint16_t res = (int16_t)SPI_SWAP_DATA_RX(data, 16);
 
-    delay(1);
-    gpio_set_level(PIN_MAX6675_SPI_CS, 1);
+    // gpio_set_level(PIN_MAX6675_SPI_CS, 1);
+
     // ESP_LOGE(TAG, "SPI res:0x%x\n", res);
     if (res & (1 << 2)) {
-        ESP_LOGE(TAG, "Sensor is not connected\n");
+        // ESP_LOGE(TAG, "Sensor is not connected\n");
+
     } else {
         res >>= 3;
-        ESP_LOGI(TAG, "SPI temp=%f\n", res * 0.25f);
-        return res * 0.25f;
+        // ESP_LOGI(TAG, "SPI temp=%f\n", res * 0.25f);
+        *pTemp = res * 0.25f;
+        return true;
     }
-    return -100.0f;
+    return false;
 }
 
 /**
@@ -74,7 +81,11 @@ float MAX6675ReadCelsius(void)
  */
 float MAX6675ReadFahrenheit(void)
 {
-    return MAX6675ReadCelsius() * 9.0f / 5.0f + 32.0f;
+    float temp = 0;
+    if (MAX6675ReadCelsius(&temp)) {
+        return temp * 9.0f / 5.0f + 32.0f;
+    }
+    return 0.0f;
 }
 
 /**
@@ -97,17 +108,17 @@ static void spi_max6675_init(spi_host_device_t host_id, uint32_t clk_speed, gpio
     devcfg.clock_speed_hz = clk_speed; // CLK时钟频率
     devcfg.mode = 0; // SPI mode (CPOL=0, CPHA=1)
     devcfg.queue_size = 7; // 事务队列大小
-    devcfg.spics_io_num = -1; // CS引脚定义
-    // devcfg.spics_io_num = cs_io_num; // CS引脚定义
+    // devcfg.spics_io_num = -1; // CS引脚定义
+    devcfg.spics_io_num = cs_io_num; // CS引脚定义
 
     // 将外设与SPI总线关联
     esp_err_t ret = spi_bus_add_device(host_id, &devcfg, &SPIDeviceHandle);
     ESP_ERROR_CHECK(ret);
 
     // 配置软件cs引脚
-    gpio_pad_select_gpio(cs_io_num);
-    gpio_set_direction(cs_io_num, GPIO_MODE_OUTPUT);
-    gpio_set_level(cs_io_num, 1);
+    // gpio_pad_select_gpio(cs_io_num);
+    // gpio_set_direction(cs_io_num, GPIO_MODE_OUTPUT);
+    // gpio_set_level(cs_io_num, 1);
 }
 
 /**
@@ -144,6 +155,6 @@ static void spi_master_init(spi_host_device_t host_id, int dma_chan, uint32_t ma
 void max6675Init(void)
 {
     spi_master_init(SPI_HOST_ID, MAX6675_DMA_CHAN, DMA_MAX_SIZE, PIN_MAX6675_SPI_MISO, GPIO_NUM_NC, PIN_MAX6675_SPI_CLK);
-    spi_max6675_init(SPI_HOST_ID, 1000 * 1000, PIN_MAX6675_SPI_CS);
+    spi_max6675_init(SPI_HOST_ID, 4 * 1000 * 1000, PIN_MAX6675_SPI_CS);
     delay(100);
 }

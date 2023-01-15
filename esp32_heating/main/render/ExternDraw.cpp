@@ -1,4 +1,3 @@
-#include "ExternDraw.h"
 #include "heating.h"
 #include <math.h>
 #include <string.h>
@@ -7,82 +6,6 @@
 #ifndef getByte
 #define getByte(addr) (*(const unsigned char*)(addr))
 #endif // getByte
-
-void EnterLogo(void)
-{
-    // for (int16_t x = -128; x < 128; x += 12) {
-    //     //绘制Logo
-    //     Disp.setDrawColor(1);
-    //     Draw_Slow_Bitmap(0, 0, Logo, 128, 64);
-    //     //转场特效
-    //     Disp.setBitmapMode(1);
-    //     Disp.setDrawColor(0);
-
-    //     Disp.drawXBM(x, 0, 128, 64, TranAnimation);
-    //     if (x < 0)
-    //         Disp.drawBox(128 + x, 0, -x, 64);
-
-    //     Disp.setBitmapMode(0);
-    //     Display();
-    // }
-    // Disp.setDrawColor(1);
-
-#if 0
-    float rate, i = 1;
-    int x, y, w;
-    uint8_t flag = 0;
-
-    while (flag != 2) {
-        GetADC0(); //播放动画是可以同时初始化软件滤波
-
-        ClearOLEDBuffer();
-
-        switch (flag) {
-        case 0:
-            if (i < 80)
-                i += 0.3 * i;
-            else
-                flag++;
-            break;
-        case 1:
-            if (i > 64)
-                i -= 0.05 * i;
-            else
-                flag++;
-            break;
-        }
-
-        rate = i / 128.0;
-        w = 170 * rate;
-        x = (128 - w) / 2;
-        y = (64 - i - 1) / 2;
-        Draw_Slow_Bitmap_Resize(x, y, Logo2, 170, 128, w, i);
-        // Draw_Slow_Bitmap_Resize(x, y, Logo_RoboBrave, 128, 128, w, i);
-        Display();
-    }
-
-    for (int16_t xx = -128; xx < 128; xx += 12) {
-        GetADC0(); //播放动画是可以同时初始化软件滤波
-
-        ClearOLEDBuffer();
-        //绘制Logo
-        Disp.setDrawColor(1);
-        Draw_Slow_Bitmap_Resize(x, y, Logo2, 170, 128, w, i);
-        // Draw_Slow_Bitmap_Resize(x, y, Logo_RoboBrave, 128, 128, w, i);
-        //转场特效
-        Disp.setBitmapMode(1);
-        Disp.setDrawColor(0);
-
-        Disp.drawXBM(xx, 0, 128, 64, TranAnimation2);
-        if (xx > 0)
-            Disp.drawBox(0, 0, xx, 64);
-
-        Disp.setBitmapMode(0);
-        Display();
-    }
-    Disp.setDrawColor(1);
-#endif
-}
 
 /**
  * @brief 清屏
@@ -554,7 +477,7 @@ void DrawTempCurve(void)
         u8g2_SetDrawColor(&u8g2, 1);
 
         // 绘制背景点
-        for (int yy = 0; yy < 64; yy += 8) {
+        for (int yy = 0; yy < OLED_SCREEN_HEIGHT; yy += 8) {
             for (int xx = 0; xx < OLED_SCREEN_WIDTH; xx += 8) {
                 u8g2_DrawPixel(&u8g2, xx + 2, yy + 4);
             }

@@ -7,12 +7,14 @@ struct _pidParm {
     double pidCurTemp; // PID输入值 (当前温度)
     double pidCurOutput; // PID输出值 要输出PWM宽度
     double pidTargetTemp; // PID目标值 (设定温度值)
+    TickType_t BeppTick; // 蜂鸣器声音判断
 };
 
 static _pidParm pidParm = {
     pidCurTemp : 0,
     pidCurOutput : 0,
     pidTargetTemp : 0,
+    BeppTick : 0,
 };
 
 static PID MyPID(&pidParm.pidCurTemp, &pidParm.pidCurOutput, &pidParm.pidTargetTemp, DIRECT);
@@ -21,9 +23,12 @@ static PID MyPID(&pidParm.pidCurTemp, &pidParm.pidCurOutput, &pidParm.pidTargetT
  * @brief 初始化PID
  *
  */
-void startPID(void)
+void resetPID(void)
 {
-    _HeatingConfig* pCurConfig = getCurrentHeatingConfig();
+    const _HeatingConfig* pCurConfig = getCurrentHeatingConfig();
+
+    pidParm.pidCurOutput = 0.0;
+    pidParm.BeppTick = xTaskGetTickCount();
 
     MyPID.SetOutputLimits(0, 100); // PID输出限幅
     MyPID.SetMode(AUTOMATIC); // PID控制模式
@@ -42,13 +47,13 @@ double getPIDOutput(void)
 }
 
 /**
- * @brief 处理PID逻辑 和 PWM输出
+ * @brief 处理PID逻辑 和 PWM输出 加热台
  *
  * @return uint16_t
  */
-static void startPIDLogic(void)
+static void startPIDLogic_Heat(void)
 {
-    _HeatingConfig* pCurConfig = getCurrentHeatingConfig();
+    const _HeatingConfig* pCurConfig = getCurrentHeatingConfig();
 
     // 当前温度
     pidParm.pidCurTemp = adcGetHeatingTemp();
@@ -62,7 +67,7 @@ static void startPIDLogic(void)
         MyPID.SetTunings(pCurConfig->PID[1][0], pCurConfig->PID[1][1], pCurConfig->PID[1][2]);
     }
 
-    // 计算输出目标值
+    // 得到输出目标温度
     if (TYPE_HEATING_CONSTANT == pCurConfig->type) {
         // 恒温焊台模式
         pidParm.pidTargetTemp = pCurConfig->targetTemp;
@@ -70,27 +75,54 @@ static void startPIDLogic(void)
     } else if (TYPE_HEATING_VARIABLE == pCurConfig->type) {
         // 回流焊模式
         pidParm.pidTargetTemp = CalculateTemp((xTaskGetTickCount() - getStartOutputTick()) / 1000.0f, pCurConfig->PTemp, NULL);
-
-    } else if (TYPE_T12 == pCurConfig->type) {
-        // T12
-        pidParm.pidTargetTemp = pCurConfig->targetTemp;
     }
 
     // PID采样周期
     MyPID.SetSampleTime(pCurConfig->PIDSample);
 
     // 计算PID输出
-    MyPID.Compute();
-
-    // 输出
-    if (TYPE_HEATING_CONSTANT == pCurConfig->type || TYPE_HEATING_VARIABLE == pCurConfig->type) {
+    if (true == MyPID.Compute()) {
+        // 输出
         pwmOutput(_TYPE_HEAT, pidParm.pidCurOutput);
 
-    } else if (TYPE_T12 == pCurConfig->type) {
-        pwmOutput(_TYPE_T12, pidParm.pidCurOutput);
+        // 当前温度 目标温度 PID输出
+        printf("3:%1.1f,%1.0f,%1.0f\n", pidParm.pidCurTemp, pidParm.pidTargetTemp, pidParm.pidCurOutput);
+    }
+}
+
+/**
+ * @brief 处理PID逻辑 和 PWM输出 T12
+ *
+ */
+static void startPIDLogic_T12(void)
+{
+    const _HeatingConfig* pCurConfig = getCurrentHeatingConfig();
+
+    // 当前温度
+    pidParm.pidCurTemp = adcGetHeatingTemp();
+
+    // PID参数设定
+    if (pidParm.pidCurTemp < pCurConfig->PIDTemp) {
+        // 远PID
+        MyPID.SetTunings(pCurConfig->PID[0][0], pCurConfig->PID[0][1], pCurConfig->PID[0][2]);
+    } else {
+        // 近PID
+        MyPID.SetTunings(pCurConfig->PID[1][0], pCurConfig->PID[1][1], pCurConfig->PID[1][2]);
     }
 
-    ESP_LOGI(TAG, "%1.1f/%1.1f 输出:%1.1f PID:%1.1f %1.1f %1.1f\n", pidParm.pidCurTemp, pidParm.pidTargetTemp, pidParm.pidCurOutput, MyPID.GetKp(), MyPID.GetKi(), MyPID.GetKd());
+    // 得到输出目标温度
+    pidParm.pidTargetTemp = pCurConfig->targetTemp;
+
+    // PID采样周期
+    MyPID.SetSampleTime(pCurConfig->PIDSample);
+
+    // 计算PID输出
+    if (true == MyPID.Compute()) {
+        // 输出
+        t12PWMOutput((uint8_t)pidParm.pidCurOutput);
+
+        // ESP_LOGI(TAG, "%1.1f/%1.1f 输出:%1.1f PID:%1.1f %1.1f %1.1f\n", pidParm.pidCurTemp, pidParm.pidTargetTemp, pidParm.pidCurOutput, MyPID.GetKp(), MyPID.GetKi(), MyPID.GetKd());
+    }
 }
 
 /**
@@ -100,11 +132,27 @@ static void startPIDLogic(void)
 void TempCtrlLoop(void)
 {
     if (getPIDIsStartOutput()) {
-        startPIDLogic();
+        const _HeatingConfig* pCurConfig = getCurrentHeatingConfig();
+
+        if (TYPE_T12 == pCurConfig->type) {
+            // T12
+            startPIDLogic_T12();
+
+        } else if (TYPE_HEATING_CONSTANT == pCurConfig->type || TYPE_HEATING_VARIABLE == pCurConfig->type) {
+            // 加热台 恒温 回流焊
+            startPIDLogic_Heat();
+        }
+
+        // 运行后 蜂鸣器 提示音
+        TickType_t time = xTaskGetTickCount();
+        if ((time - pidParm.BeppTick) >= 1000) {
+            pidParm.BeppTick = time;
+            SetSound(BeepSoundDI, false);
+        }
 
     } else {
         // PID停止输出
         pwmOutput(_TYPE_HEAT, 0);
-        pwmOutput(_TYPE_T12, 0);
+        t12PWMOutput(0);
     }
 }

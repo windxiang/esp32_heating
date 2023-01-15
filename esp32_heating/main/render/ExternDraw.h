@@ -6,8 +6,6 @@ extern "C" {
 
 #include "stdint.h"
 
-void EnterLogo(void);
-
 void ClearOLEDBuffer(void);
 void Display(void);
 

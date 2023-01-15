@@ -10,7 +10,7 @@ extern "C" {
 #endif // __cplusplus
 
 typedef void (*callbackFunction)(void);
-typedef void (*parameterizedCallbackFunction)(void*);
+typedef void (*parameterizedCallbackFunction)(uint32_t);
 
 #ifdef __cplusplus
 }
@@ -29,42 +29,42 @@ public:
      * @param newFunction This function will be called when the event has been detected.
      */
     void attachClick(callbackFunction newFunction);
-    void attachClick(parameterizedCallbackFunction newFunction, void* parameter);
+    void attachClick(parameterizedCallbackFunction newFunction, uint32_t parameter);
 
     /**
      * Attach an event to be called after a double click is detected.
      * @param newFunction This function will be called when the event has been detected.
      */
     void attachDoubleClick(callbackFunction newFunction);
-    void attachDoubleClick(parameterizedCallbackFunction newFunction, void* parameter);
+    void attachDoubleClick(parameterizedCallbackFunction newFunction, uint32_t parameter);
 
     /**
      * Attach an event to be called after a multi click is detected.
      * @param newFunction This function will be called when the event has been detected.
      */
     void attachMultiClick(callbackFunction newFunction);
-    void attachMultiClick(parameterizedCallbackFunction newFunction, void* parameter);
+    void attachMultiClick(parameterizedCallbackFunction newFunction, uint32_t parameter);
 
     /**
      * Attach an event to fire when the button is pressed and held down.
      * @param newFunction
      */
     void attachLongPressStart(callbackFunction newFunction);
-    void attachLongPressStart(parameterizedCallbackFunction newFunction, void* parameter);
+    void attachLongPressStart(parameterizedCallbackFunction newFunction, uint32_t parameter);
 
     /**
      * Attach an event to fire as soon as the button is released after a long press.
      * @param newFunction
      */
     void attachLongPressStop(callbackFunction newFunction);
-    void attachLongPressStop(parameterizedCallbackFunction newFunction, void* parameter);
+    void attachLongPressStop(parameterizedCallbackFunction newFunction, uint32_t parameter);
 
     /**
      * Attach an event to fire periodically while the button is held down.
      * @param newFunction
      */
     void attachDuringLongPress(callbackFunction newFunction);
-    void attachDuringLongPress(parameterizedCallbackFunction newFunction, void* parameter);
+    void attachDuringLongPress(parameterizedCallbackFunction newFunction, uint32_t parameter);
 
     // ----- State machine functions -----
 
@@ -113,27 +113,27 @@ private:
     // These variables will hold functions acting as event source.
     callbackFunction _clickFunc = NULL;
     parameterizedCallbackFunction _paramClickFunc = NULL;
-    void* _clickFuncParam = NULL;
+    uint32_t _clickFuncParam = 0;
 
     callbackFunction _doubleClickFunc = NULL;
     parameterizedCallbackFunction _paramDoubleClickFunc = NULL;
-    void* _doubleClickFuncParam = NULL;
+    uint32_t _doubleClickFuncParam = 0;
 
     callbackFunction _multiClickFunc = NULL;
     parameterizedCallbackFunction _paramMultiClickFunc = NULL;
-    void* _multiClickFuncParam = NULL;
+    uint32_t _multiClickFuncParam = 0;
 
     callbackFunction _longPressStartFunc = NULL;
     parameterizedCallbackFunction _paramLongPressStartFunc = NULL;
-    void* _longPressStartFuncParam = NULL;
+    uint32_t _longPressStartFuncParam = 0;
 
     callbackFunction _longPressStopFunc = NULL;
     parameterizedCallbackFunction _paramLongPressStopFunc = NULL;
-    void* _longPressStopFuncParam;
+    uint32_t _longPressStopFuncParam = 0;
 
     callbackFunction _duringLongPressFunc = NULL;
     parameterizedCallbackFunction _paramDuringLongPressFunc = NULL;
-    void* _duringLongPressFuncParam = NULL;
+    uint32_t _duringLongPressFuncParam = 0;
 
     // These variables that hold information across the upcoming tick calls.
     // They are initialized once on program start and are updated every time the

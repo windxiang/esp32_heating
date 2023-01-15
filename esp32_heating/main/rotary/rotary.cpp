@@ -20,7 +20,8 @@ typedef struct {
 static _RotaryData RotaryData = {};
 
 static OneButton RotaryButton(PIN_BUTTON, true); // 编码器按键逻辑处理
-static OneButton NormalButton(PIN_KEY1, true); // 普通按键
+static OneButton NormalButton1(PIN_KEY1, true); // 普通按键
+static OneButton NormalButton2(PIN_KEY2, true); // 普通按键
 
 #define ROTARY_FREQDIV 2.0f // 编码器分频
 
@@ -74,12 +75,12 @@ static void IRAM_ATTR rotary_handler(void* arg)
  * @brief 编码器按键-单击回调函数
  *
  */
-static void RotaryButtonClick(void)
+static void Callback_ButtonClick(uint32_t parameter)
 {
     if (NULL != RotaryData.buttonQueue) {
-        ROTARY_BUTTON_TYPE f = RotaryButton_Click;
+        ROTARY_BUTTON_TYPE f = (ROTARY_BUTTON_TYPE)parameter;
         xQueueSend(RotaryData.buttonQueue, &f, 0);
-        sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
+        sendButtonEvent(EVENT_LOGIC_KEYUP);
         SetSound(BeepSoundClick, false);
     }
 }
@@ -88,12 +89,12 @@ static void RotaryButtonClick(void)
  * @brief 编码器按键-长按回调函数
  *
  */
-static void RotaryButtonLongClick(void)
+static void Callback_ButtonLongClick(uint32_t parameter)
 {
     if (NULL != RotaryData.buttonQueue) {
-        ROTARY_BUTTON_TYPE f = RotaryButton_LongClick;
+        ROTARY_BUTTON_TYPE f = (ROTARY_BUTTON_TYPE)parameter;
         xQueueSend(RotaryData.buttonQueue, &f, 0);
-        sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
+        sendButtonEvent(EVENT_LOGIC_KEYUP);
         SetSound(BeepSoundLongClick, false);
     }
 }
@@ -102,55 +103,12 @@ static void RotaryButtonLongClick(void)
  * @brief 编码器按键-双击回调函数
  *
  */
-static void RotaryButtonDoubleClick(void)
+static void Callback_ButtonDoubleClick(uint32_t parameter)
 {
     if (NULL != RotaryData.buttonQueue) {
-        ROTARY_BUTTON_TYPE f = RotaryButton_DoubleClick;
+        ROTARY_BUTTON_TYPE f = (ROTARY_BUTTON_TYPE)parameter;
         xQueueSend(RotaryData.buttonQueue, &f, 0);
-        sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
-        SetSound(BeepSoundDoubleClick, false);
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////
-/**
- * @brief 普通按键-单击回调函数
- *
- */
-static void NormalButtonClick(void)
-{
-    if (NULL != RotaryData.buttonQueue) {
-        ROTARY_BUTTON_TYPE f = NormalButton_Click;
-        xQueueSend(RotaryData.buttonQueue, &f, 0);
-        sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
-        SetSound(BeepSoundClick, false);
-    }
-}
-
-/**
- * @brief 普通按键-长按回调函数
- *
- */
-static void NormalButtonLongClick(void)
-{
-    if (NULL != RotaryData.buttonQueue) {
-        ROTARY_BUTTON_TYPE f = NormalButton_LongClick;
-        xQueueSend(RotaryData.buttonQueue, &f, 0);
-        sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
-        SetSound(BeepSoundLongClick, false);
-    }
-}
-
-/**
- * @brief 普通按键-双击回调函数
- *
- */
-static void NormalButtonDoubleClick(void)
-{
-    if (NULL != RotaryData.buttonQueue) {
-        ROTARY_BUTTON_TYPE f = NormalButton_DoubleClick;
-        xQueueSend(RotaryData.buttonQueue, &f, 0);
-        sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
+        sendButtonEvent(EVENT_LOGIC_KEYUP);
         SetSound(BeepSoundDoubleClick, false);
     }
 }
@@ -248,14 +206,15 @@ static void rotary_task(void* arg)
         // 编码器旋转
         if (xQueueReceive(RotaryData.encoderQueue, &f, 10 / portTICK_PERIOD_MS) == pdPASS) {
             RotaryData.EncoderPosition = constrain(RotaryData.EncoderPosition + (f ? RotaryData.EncoderStepPosition : -RotaryData.EncoderStepPosition), RotaryData.EncoderMinPosition, RotaryData.EncoderMaxPosition);
-            sendButtonEvent(EVENT_LOGIC_KEYUPDATE);
+            sendButtonEvent(EVENT_LOGIC_KEYUP);
         }
 
         // 编码器按键
         RotaryButton.tick();
 
         // 普通按键
-        NormalButton.tick();
+        NormalButton1.tick();
+        NormalButton2.tick();
     }
 }
 
@@ -288,7 +247,7 @@ void rotaryInit(void)
     io_conf.intr_type = GPIO_INTR_DISABLE;
     gpio_config(&io_conf);
 
-    // 初始化普通按键
+    // 初始化普通按键1
     io_conf.mode = GPIO_MODE_INPUT;
     io_conf.pin_bit_mask = BIT64(PIN_KEY1);
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
@@ -296,19 +255,34 @@ void rotaryInit(void)
     io_conf.intr_type = GPIO_INTR_DISABLE;
     gpio_config(&io_conf);
 
-    RotaryButton.attachClick(RotaryButtonClick);
-    RotaryButton.attachDoubleClick(RotaryButtonDoubleClick);
-    RotaryButton.attachLongPressStart(RotaryButtonLongClick);
+    // 初始化普通按键2
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pin_bit_mask = BIT64(PIN_KEY2);
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    gpio_config(&io_conf);
+
+    RotaryButton.attachClick(Callback_ButtonClick, RotaryButton_Click);
+    RotaryButton.attachDoubleClick(Callback_ButtonDoubleClick, RotaryButton_DoubleClick);
+    RotaryButton.attachLongPressStart(Callback_ButtonLongClick, RotaryButton_LongClick);
     RotaryButton.setDebounceTicks(30 / portTICK_PERIOD_MS);
     RotaryButton.setClickTicks(200 / portTICK_PERIOD_MS);
     RotaryButton.setPressTicks(300 / portTICK_PERIOD_MS);
 
-    NormalButton.attachClick(NormalButtonClick);
-    NormalButton.attachDoubleClick(NormalButtonDoubleClick);
-    NormalButton.attachLongPressStart(NormalButtonLongClick);
-    NormalButton.setDebounceTicks(30 / portTICK_PERIOD_MS);
-    NormalButton.setClickTicks(200 / portTICK_PERIOD_MS);
-    NormalButton.setPressTicks(300 / portTICK_PERIOD_MS);
+    NormalButton1.attachClick(Callback_ButtonClick, NormalButton1_Click);
+    NormalButton1.attachDoubleClick(Callback_ButtonDoubleClick, NormalButton1_DoubleClick);
+    NormalButton1.attachLongPressStart(Callback_ButtonLongClick, NormalButton1_LongClick);
+    NormalButton1.setDebounceTicks(30 / portTICK_PERIOD_MS);
+    NormalButton1.setClickTicks(200 / portTICK_PERIOD_MS);
+    NormalButton1.setPressTicks(300 / portTICK_PERIOD_MS);
+
+    NormalButton2.attachClick(Callback_ButtonClick, NormalButton2_Click);
+    NormalButton2.attachDoubleClick(Callback_ButtonDoubleClick, NormalButton2_DoubleClick);
+    NormalButton2.attachLongPressStart(Callback_ButtonLongClick, NormalButton2_LongClick);
+    NormalButton2.setDebounceTicks(30 / portTICK_PERIOD_MS);
+    NormalButton2.setClickTicks(200 / portTICK_PERIOD_MS);
+    NormalButton2.setPressTicks(300 / portTICK_PERIOD_MS);
 
     RotarySet(0.0f, 100.f, 1.f, 1.f);
 

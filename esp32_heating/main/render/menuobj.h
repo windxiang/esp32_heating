@@ -10,7 +10,7 @@
 // 卡尔曼滤波计算
 typedef struct
 {
-    float LastP; // 上次估算协方差 初始化值为0.02
+    float LastP; // 上次估算协方差 初始化值为0.02 可以随便设置  但是不能为0（为0的话卡尔曼滤波器就认为已经是最优滤波器了）
     float Now_P; // 当前估算协方差 初始化值为0
     float out; // 卡尔曼滤波器输出 初始化值为0
     float Kg; // 卡尔曼增益 初始化值为0
@@ -21,8 +21,11 @@ typedef struct {
     uint8_t UseKalman; // 使用卡尔曼
     float Cycle; // ADC采样周期(ms)
     float calibrationVal; // 校准补偿
-    float KalmanQ; // 过程噪声协方差
-    float KalmanR; // 观测噪声协方差
+    float KalmanQ; // 过程噪声协方差  Q增大，动态响应变快(越跟随传感器)，收敛稳定性变坏
+    float KalmanR; // 观测噪声协方差  R增大，动态响应变慢(滞后性变大)，收敛稳定性变好
+    // Q, R 讲白了就是(买的破温度计有多破，以及你的超人力有多强)
+    // Q参数 调整滤波后的 曲线平滑程度，Q越小越平滑、 Q值越大跟随传感器速度越快 曲线越不平滑
+    // R参数 调整滤波后的 曲线与实测曲线的相近程度：R越小越接近、R越大滞后性越明显并且曲线越平滑
 } _KalmanParm;
 
 typedef struct {
@@ -118,7 +121,6 @@ struct _SystemMenuSaveData {
     uint8_t OptionStripFixedLength_Flag; // 选项条固定 自适应
     float ScreenProtectorTime; // 屏保在休眠后的触发时间 (秒)
     float ScreenBrightness; // 屏幕亮度
-    float SystemVolage; // 系统电压设置(mV)
     float UndervoltageAlert; // 系统电压 欠压警告阈值 (单位V)
     char BLEName[20]; // 蓝牙设备名称
     char BootPasswd[20]; // 开机密码
@@ -145,6 +147,7 @@ enum SwitchComponents_Obj {
     SwitchComponents_CurConfigIndex, // 当前加热台配置索引
     SwitchComponents_HeatMoe, // 恒温加热台 回流焊加热台 T12加热台
     SwitchComponents_T12VibrationDetection, // T12 震动开关检测配置
+
     // 卡尔曼滤波开关
     SwitchComponents_KFP1, // 卡尔曼滤波开关
     SwitchComponents_KFP2, // 卡尔曼滤波开关
@@ -152,6 +155,7 @@ enum SwitchComponents_Obj {
     SwitchComponents_KFP4, // 卡尔曼滤波开关
     SwitchComponents_KFP5, // 卡尔曼滤波开关
     SwitchComponents_KFP6, // 卡尔曼滤波开关
+    SwitchComponents_KFP7, // 卡尔曼滤波开关
 };
 
 /**
@@ -162,7 +166,6 @@ enum SlideComponents_Obj {
     ///////////////////////////////////////////////
     // 系统配置
     SlideComponents_ScreenBrightness, // 屏幕亮度
-    SlideComponents_SystemVoltage, // 电压设置(mV)
     SlideComponents_UndervoltageAlert, // 欠压提醒(V)
     SlideComponents_Scroll, // 文本渲染模式下使用 每页显示4个条目 中的第几条
     SlideComponents_ScreenProtectorTime, // 屏保触发(秒)
@@ -198,30 +201,35 @@ enum SlideComponents_Obj {
     SlideComponents_KFP_Q1, // 过程噪声协方差
     SlideComponents_KFP_R1, // 观察噪声协方差
 
-    SlideComponents_ADC_Cycle2, // 热电偶采样周期(ms)
+    SlideComponents_ADC_Cycle2, // T12温度
     SlideComponents_TempComp_2, // 温度补偿
     SlideComponents_KFP_Q2, // 过程噪声协方差
     SlideComponents_KFP_R2, // 观察噪声协方差
 
-    SlideComponents_ADC_Cycle3, // 热电偶采样周期(ms)
+    SlideComponents_ADC_Cycle3, // T12电流
     SlideComponents_TempComp_3, // 温度补偿
     SlideComponents_KFP_Q3, // 过程噪声协方差
     SlideComponents_KFP_R3, // 观察噪声协方差
 
-    SlideComponents_ADC_Cycle4, // 热电偶采样周期(ms)
+    SlideComponents_ADC_Cycle4, // T12 NTC
     SlideComponents_TempComp_4, // 温度补偿
     SlideComponents_KFP_Q4, // 过程噪声协方差
     SlideComponents_KFP_R4, // 观察噪声协方差
 
-    SlideComponents_ADC_Cycle5, // 热电偶采样周期(ms)
+    SlideComponents_ADC_Cycle5, // 系统输入电压
     SlideComponents_TempComp_5, // 温度补偿
     SlideComponents_KFP_Q5, // 过程噪声协方差
     SlideComponents_KFP_R5, // 观察噪声协方差
 
-    SlideComponents_ADC_Cycle6, // 热电偶采样周期(ms)
+    SlideComponents_ADC_Cycle6, // 5V电压
     SlideComponents_TempComp_6, // 温度补偿
     SlideComponents_KFP_Q6, // 过程噪声协方差
     SlideComponents_KFP_R6, // 观察噪声协方差
+
+    SlideComponents_ADC_Cycle7, // 室温
+    SlideComponents_TempComp_7, // 温度补偿
+    SlideComponents_KFP_Q7, // 过程噪声协方差
+    SlideComponents_KFP_R7, // 观察噪声协方差
 
     // 最小 最大温度值
     SlideComponents_HeatMinTemp, // 加热台最小最大温度
@@ -236,7 +244,7 @@ enum SlideComponents_Obj {
 
 // 滑动菜单结构体
 struct SlideBar {
-    float* val; //值
+    float* val; // 值
     float min; // 最小值
     float max; // 最大值
     float step; // 步进
@@ -267,6 +275,7 @@ typedef enum {
 enum PANELSET {
     PANELSET_Simple = 0, // 简约模式
     PANELSET_Detailed, // 详细模式
+    PANELSET_Trend, // 趋势图
 };
 
 // T12 震动开关
@@ -292,8 +301,8 @@ struct subMenu {
     _MenuType type; // 菜单类型
     std::string name;
     uint8_t* icon;
-    uint8_t ParamA; //附加参数A (Type_GotoMenu-打开对应的lid) (Type_Switch-开关id) (Type_Slider-滑动条id)
-    uint8_t ParamB; //附加参数B (Type_GotoMenu-打开对应的图标) (Type_Slider-滑动条：true?执行函数:无操作)
+    uint8_t ParamA; // 附加参数A (Type_GotoMenu-打开对应的lid) (Type_Switch-开关id) (Type_Slider-滑动条id)
+    uint8_t ParamB; // 附加参数B (Type_GotoMenu-打开对应的图标) (Type_Slider-滑动条：true?执行函数:无操作)
     void (*function)();
 };
 
@@ -323,13 +332,12 @@ extern "C" {
 void initMenuSystem(void);
 menuSystem* getCurRenderMenu(int menuID);
 subMenu* getSubMenu(menuSystem* pMenuRoot, int id);
-_HeatSystemConfig* getHeatingSystemConfig(void);
-_HeatingConfig* getCurrentHeatingConfig(void);
+
 float getScreenProtectorTime(void);
 float getSystemUndervoltageAlert(void);
-float getSystemVoltage(void);
 uint8_t getBlueToolsStatus(void);
 uint8_t getVolume(void);
+void JumpWithTitle(void);
 
 #ifdef __cplusplus
 }

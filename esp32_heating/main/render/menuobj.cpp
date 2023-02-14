@@ -17,7 +17,7 @@ _SystemMenuSaveData SystemMenuSaveData = {
 
     ScreenProtectorTime : 60.0f, // 屏保在休眠后的触发时间 (秒)
     ScreenBrightness : 128.0f, // 屏幕亮度
-    UndervoltageAlert : 18.0f, // 系统电压 欠压警告阈值 (单位V)
+    UndervoltageAlert : 18.0f, // 输入电压 欠压警告阈值 (单位V)
 
     BLEName : { 'H', 'e', 'a', 't', 'i', 'n', 'g' }, // 蓝牙设备名称
     BootPasswd : {}, // 开机密码
@@ -348,7 +348,7 @@ static std::vector<menuSystem> menuInfo = {
                                          { Type_MenuName, "温度设置", NULL, 0, 1, NULL },
                                          { Type_GotoMenu, "加热台管理", IMG_Tip, 201, 0, *flushMaxTemp },
                                          { Type_GotoMenu, "卡尔曼滤波器", kalmanImg, 202, 0, NULL },
-                                         { Type_GotoMenu, "温度管理", kalmanImg, 203, 0, NULL },
+                                         { Type_GotoMenu, "温度管理", tempImg, 203, 0, NULL },
                                          { Type_ReturnMenu, "返回", Set7, 0, 1, NULL },
                                      } },
 
@@ -369,60 +369,61 @@ static std::vector<menuSystem> menuInfo = {
                                         { Type_MenuName, "卡尔曼滤波器", NULL, 200, 2, NULL },
 
                                         // 加热台
-                                        { Type_Switch, "加热台-状态", NULL, SwitchComponents_KFP1, 0, NULL },
+                                        { Type_MenuName, "-加热台-", NULL, 200, 2, NULL },
+                                        { Type_Switch, "状态", NULL, SwitchComponents_KFP1, 0, NULL },
                                         { Type_Slider, "采样周期(ms)", NULL, SlideComponents_ADC_Cycle1, 0, NULL },
                                         { Type_Slider, "温度补偿", NULL, SlideComponents_TempComp_1, 0, NULL },
                                         { Type_Slider, "过程噪声协方差", NULL, SlideComponents_KFP_Q1, 0, NULL },
                                         { Type_Slider, "观察噪声协方差", NULL, SlideComponents_KFP_R1, 0, NULL },
-                                        { Type_MenuName, "----------", NULL, 200, 2, NULL },
 
-                                        // T12
-                                        { Type_Switch, "T12温度-状态", NULL, SwitchComponents_KFP2, 0, NULL },
+                                        // T12烙铁温度
+                                        { Type_MenuName, "-T12烙铁温度-", NULL, 200, 2, NULL },
+                                        { Type_Switch, "状态", NULL, SwitchComponents_KFP2, 0, NULL },
                                         { Type_Slider, "采样周期(ms)", NULL, SlideComponents_ADC_Cycle2, 0, NULL },
                                         { Type_Slider, "温度补偿", NULL, SlideComponents_TempComp_2, 0, NULL },
                                         { Type_Slider, "过程噪声协方差", NULL, SlideComponents_KFP_Q2, 0, NULL },
                                         { Type_Slider, "观察噪声协方差", NULL, SlideComponents_KFP_R2, 0, NULL },
-                                        { Type_MenuName, "----------", NULL, 200, 2, NULL },
 
-                                        // T12
-                                        { Type_Switch, "T12-状态", NULL, SwitchComponents_KFP3, 0, NULL },
+                                        // T12电流
+                                        { Type_MenuName, "-T12电流-", NULL, 200, 2, NULL },
+                                        { Type_Switch, "状态", NULL, SwitchComponents_KFP3, 0, NULL },
                                         { Type_Slider, "采样周期(ms)", NULL, SlideComponents_ADC_Cycle3, 0, NULL },
                                         { Type_Slider, "温度补偿", NULL, SlideComponents_TempComp_3, 0, NULL },
                                         { Type_Slider, "过程噪声协方差", NULL, SlideComponents_KFP_Q3, 0, NULL },
                                         { Type_Slider, "观察噪声协方差", NULL, SlideComponents_KFP_R3, 0, NULL },
-                                        { Type_MenuName, "----------", NULL, 200, 2, NULL },
 
-                                        // T12
-                                        { Type_Switch, "T12-状态", NULL, SwitchComponents_KFP4, 0, NULL },
+                                        // T12 PCB NTC温度
+                                        { Type_MenuName, "-T12 NTC-", NULL, 200, 2, NULL },
+                                        { Type_Switch, "状态", NULL, SwitchComponents_KFP4, 0, NULL },
                                         { Type_Slider, "采样周期(ms)", NULL, SlideComponents_ADC_Cycle4, 0, NULL },
                                         { Type_Slider, "温度补偿", NULL, SlideComponents_TempComp_4, 0, NULL },
                                         { Type_Slider, "过程噪声协方差", NULL, SlideComponents_KFP_Q4, 0, NULL },
                                         { Type_Slider, "观察噪声协方差", NULL, SlideComponents_KFP_R4, 0, NULL },
-                                        { Type_MenuName, "----------", NULL, 200, 2, NULL },
 
-                                        // 系统电压
-                                        { Type_Switch, "系统电压-状态", NULL, SwitchComponents_KFP5, 0, NULL },
+                                        // 输入电压
+                                        { Type_MenuName, "-输入电压-", NULL, 200, 2, NULL },
+                                        { Type_Switch, "状态", NULL, SwitchComponents_KFP5, 0, NULL },
                                         { Type_Slider, "采样周期(ms)", NULL, SlideComponents_ADC_Cycle5, 0, NULL },
                                         { Type_Slider, "温度补偿", NULL, SlideComponents_TempComp_5, 0, NULL },
                                         { Type_Slider, "过程噪声协方差", NULL, SlideComponents_KFP_Q5, 0, NULL },
                                         { Type_Slider, "观察噪声协方差", NULL, SlideComponents_KFP_R5, 0, NULL },
-                                        { Type_MenuName, "----------", NULL, 200, 2, NULL },
 
                                         // 5V电压
-                                        { Type_Switch, "5V电压-状态", NULL, SwitchComponents_KFP6, 0, NULL },
+                                        { Type_MenuName, "-5V电压-", NULL, 200, 2, NULL },
+                                        { Type_Switch, "状态", NULL, SwitchComponents_KFP6, 0, NULL },
                                         { Type_Slider, "采样周期(ms)", NULL, SlideComponents_ADC_Cycle6, 0, NULL },
                                         { Type_Slider, "温度补偿", NULL, SlideComponents_TempComp_6, 0, NULL },
                                         { Type_Slider, "过程噪声协方差", NULL, SlideComponents_KFP_Q6, 0, NULL },
                                         { Type_Slider, "观察噪声协方差", NULL, SlideComponents_KFP_R6, 0, NULL },
-                                        { Type_MenuName, "----------", NULL, 200, 2, NULL },
 
-                                        // 环境温度
-                                        { Type_Switch, "环境温度-状态", NULL, SwitchComponents_KFP7, 0, NULL },
+                                        // PCB温度
+                                        { Type_MenuName, "-PCB温度-", NULL, 200, 2, NULL },
+                                        { Type_Switch, "状态", NULL, SwitchComponents_KFP7, 0, NULL },
                                         { Type_Slider, "采样周期(ms)", NULL, SlideComponents_ADC_Cycle7, 0, NULL },
                                         { Type_Slider, "温度补偿", NULL, SlideComponents_TempComp_7, 0, NULL },
                                         { Type_Slider, "过程噪声协方差", NULL, SlideComponents_KFP_Q7, 0, NULL },
                                         { Type_Slider, "观察噪声协方差", NULL, SlideComponents_KFP_R7, 0, NULL },
-                                        { Type_MenuName, "----------", NULL, 200, 2, NULL },
+
                                         { Type_ReturnMenu, "返回", NULL, 200, 2, NULL },
                                     } },
 
@@ -463,7 +464,7 @@ static std::vector<menuSystem> menuInfo = {
     { 212, 0, 0, 0, MenuRenderText, {
                                         { Type_MenuName, "PID参数", NULL, 201, 2, *saveCurrentHeatData },
                                         { Type_Slider, "PID采样时间", NULL, SlideComponents_PIDSample, 0, NULL },
-                                        { Type_Slider, "PID切换温度", NULL, SlideComponents_SwitchTemp, 0, NULL }, // 相差多少度开始切换
+                                        { Type_Slider, "临近温度切换", NULL, SlideComponents_SwitchTemp, 0, NULL }, // 相差多少度开始切换
                                         { Type_GotoMenu, "PID爬升期参数", NULL, 213, 0, NULL },
                                         { Type_GotoMenu, "PID接近期参数", NULL, 214, 0, NULL },
                                         { Type_ReturnMenu, "返回", NULL, 201, 2, *saveCurrentHeatData },

@@ -66,11 +66,11 @@ static bool cali_enable = false;
 static _strADCInfo strADCInfo[adc_last_max] = {
     [adc_HeatingTemp] = { 0, 0, ADC1_CHANNEL_MAX, 0, ADC_ATTEN_DB_11, {} }, // 加热台K型热电偶 这一路不属于ADC范围里  是使用MAX6675芯片进行采集的
     [adc_T12Temp] = { 0, 0, ADC1_CHANNEL_0, 0, ADC_ATTEN_DB_11, {} }, // T12 烙铁头温度
-    [adc_T12Cur] = { 0, 0, ADC1_CHANNEL_3, 0, ADC_ATTEN_DB_11, {} }, // T12 电流
+    [adc_T12Cur] = { 0, 0, ADC1_CHANNEL_1, 0, ADC_ATTEN_DB_11, {} }, // T12 电流
     [adc_T12NTC] = { 0, 0, ADC1_CHANNEL_6, 0, ADC_ATTEN_DB_11, {} }, // T12 NTC
-    [adc_SystemVol] = { 0, 0, ADC1_CHANNEL_1, 0, ADC_ATTEN_DB_11, {} }, // 系统输入电压
-    [adc_SystemRef] = { 0, 0, ADC1_CHANNEL_2, 0, ADC_ATTEN_DB_11, {} }, // 系统5V电压
-    [adc_RoomTemp] = { 0, 0, ADC1_CHANNEL_7, 0, ADC_ATTEN_DB_11, {} }, // PCB NTC 温度
+    [adc_SystemVol] = { 0, 0, ADC1_CHANNEL_7, 0, ADC_ATTEN_DB_11, {} }, // 系统输入电压
+    [adc_SystemRef] = { 0, 0, ADC1_CHANNEL_3, 0, ADC_ATTEN_DB_11, {} }, // 系统5V电压
+    [adc_RoomTemp] = { 0, 0, ADC1_CHANNEL_2, 0, ADC_ATTEN_DB_11, {} }, // PCB NTC 温度
 };
 
 /**

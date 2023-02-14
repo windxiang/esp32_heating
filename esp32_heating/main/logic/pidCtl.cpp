@@ -59,7 +59,7 @@ static void startPIDLogic_Heat(void)
     pidParm.pidCurTemp = adcGetHeatingTemp();
 
     // PID参数设定
-    if (pidParm.pidCurTemp < pCurConfig->PIDTemp) {
+    if (pidParm.pidCurTemp < (pCurConfig->targetTemp - pCurConfig->PIDTemp)) {
         // 远PID
         MyPID.SetTunings(pCurConfig->PID[0][0], pCurConfig->PID[0][1], pCurConfig->PID[0][2]);
     } else {

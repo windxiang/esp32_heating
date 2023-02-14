@@ -84,17 +84,9 @@
 #define STRIP_LED_NUMBER 1 // WS2812 LED 个数
 
 // MAX6675 SPI
-#define PIN_MAX6675_SPI_CS GPIO_NUM_5
-#define PIN_MAX6675_SPI_CLK GPIO_NUM_18
-#define PIN_MAX6675_SPI_MISO GPIO_NUM_19
-
-// ADC 采集
-#define PIN_ADC_T12_TEMP 36 // ADC1_CH0 SENSOR_VP
-#define PIN_ADC_VCC 37 // ADC1_CH1 SENSOR_CAPP
-#define PIN_ADC_REF 38 // ADC1_CH2 SENSOR_CAPN
-#define PIN_ADC_T12_CUR 39 // ADC1_CH3 SENSOR_VN
-#define PIN_ADC_T12_NTC 34 // ADC1_CH6 VDET_1
-#define PIN_ADC_NTC_ROOM 35 // ADC1_CH7 VDET_2
+#define PIN_MAX6675_SPI_CS GPIO_NUM_18
+#define PIN_MAX6675_SPI_CLK GPIO_NUM_19
+#define PIN_MAX6675_SPI_MISO GPIO_NUM_5
 
 // T12
 #define PIN_T12_SLEEP GPIO_NUM_13 // GPIO T12休眠检测
@@ -120,7 +112,7 @@ enum _enumADCTYPE {
     adc_T12NTC, // T12 NTC温度
     adc_SystemVol, // 系统输入电压
     adc_SystemRef, // 系统5V电压
-    adc_RoomTemp, // 环境温度
+    adc_RoomTemp, // PCB温度
     adc_last_max // 放在末尾
 };
 

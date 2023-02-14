@@ -121,7 +121,7 @@ struct _SystemMenuSaveData {
     uint8_t OptionStripFixedLength_Flag; // 选项条固定 自适应
     float ScreenProtectorTime; // 屏保在休眠后的触发时间 (秒)
     float ScreenBrightness; // 屏幕亮度
-    float UndervoltageAlert; // 系统电压 欠压警告阈值 (单位V)
+    float UndervoltageAlert; // 输入电压 欠压警告阈值 (单位V)
     char BLEName[20]; // 蓝牙设备名称
     char BootPasswd[20]; // 开机密码
 };

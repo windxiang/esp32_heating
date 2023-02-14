@@ -55,7 +55,7 @@ _KalmanInfo KalmanInfo[adc_last_max] = {
         .filter = { 0.02, 0, 0, 0 },
         .parm = { 1, 100, 0, 0.1f, 0.1f },
     },
-    // 系统电压
+    // 输入电压
     [adc_SystemVol] = {
         .filter = { 0.02, 0, 0, 0 },
         .parm = { 1, 100, 0, 0.1f, 0.1f },
@@ -151,13 +151,13 @@ void _newHeatConfig(const char* pName)
     config.PTemp[6] = 3.0f; // 降温斜率
 
     // 恒温模式目标输出温度(°C)
-    config.targetTemp = 280.0f;
+    config.targetTemp = 120.0f;
 
     // PID采样时间
     config.PIDSample = 100.0f;
 
     // PID切换温度
-    config.PIDTemp = 10.0f; // 相差10度时开始切换
+    config.PIDTemp = 30.0f; // 相差10度时开始切换
 
     // 爬升期 PID
     config.PID[0][0] = 2.0f;

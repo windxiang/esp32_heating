@@ -59,8 +59,8 @@ extern uint8_t Pointer[];
 extern uint8_t Lightning[];
 extern uint8_t Battery_NoPower[];
 extern uint8_t IMG_BLE_S[];
-//状态提示图标
-// width:14,height:14
+// 状态提示图标
+//  width:14,height:14
 extern uint8_t c1[];
 extern uint8_t c2[];
 extern uint8_t c3[];
@@ -71,6 +71,7 @@ extern uint8_t CheckBoxSelection[];
 
 extern uint8_t pidImg[];
 extern uint8_t kalmanImg[];
+extern uint8_t tempImg[];
 
 #ifdef __cplusplus
 }

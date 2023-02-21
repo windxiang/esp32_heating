@@ -70,8 +70,7 @@ struct _HeatingConfig {
     HEATINGTYPE type; // 类型
     float PTemp[7]; // 温度曲线
     float PIDSample; // PID采样时间
-    float PIDTemp; // 远近PID切换温度
-    float PID[2][3]; // PID系数[远PID，近PID]
+    float PID[1][3]; // PID系数[远PID，近PID]
     float targetTemp; // 恒温模式目标输出温度(°C)
 };
 
@@ -187,13 +186,9 @@ enum SlideComponents_Obj {
 
     // PID参数
     SlideComponents_PIDSample, // PID采样时间
-    SlideComponents_SwitchTemp, // PID温度切换度数
-    SlideComponents_PID_AP, // 比例P(爬升期)
+    SlideComponents_PID_AP, // 比例P
     SlideComponents_PID_AI, // 积分I
     SlideComponents_PID_AD, // 微分D
-    SlideComponents_PID_CP, // 比例P(接近期)
-    SlideComponents_PID_CI, // 积分I
-    SlideComponents_PID_CD, // 微分D
 
     // 卡尔曼滤波
     SlideComponents_ADC_Cycle1, // 热电偶采样周期(ms)

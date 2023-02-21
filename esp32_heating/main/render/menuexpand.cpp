@@ -22,9 +22,9 @@ _HeatingSystem HeatingConfig = {
     curConfigIndex : -1, // 当前使用配置索引
     systemConfig : {
         HeatMinTemp : 0.0f,
-        HeatMaxTemp : 300.0f,
+        HeatMaxTemp : 250.0f,
         T12MinTemp : 0.0f,
-        T12MaxTemp : 300.0f,
+        T12MaxTemp : 350.0f,
         T12IdleTime : 30.0f,
         T12IdleTemp : 150.0f,
         T12StopTime : 120.0f,
@@ -151,22 +151,15 @@ void _newHeatConfig(const char* pName)
     config.PTemp[6] = 3.0f; // 降温斜率
 
     // 恒温模式目标输出温度(°C)
-    config.targetTemp = 120.0f;
+    config.targetTemp = 220.0f;
 
     // PID采样时间
     config.PIDSample = 100.0f;
 
-    // PID切换温度
-    config.PIDTemp = 30.0f; // 相差10度时开始切换
-
     // 爬升期 PID
-    config.PID[0][0] = 2.0f;
-    config.PID[0][1] = 0.2f;
-    config.PID[0][2] = 1.0f;
-    // 接近期 PID
-    config.PID[1][0] = 1.0f;
-    config.PID[1][1] = 0.05f;
-    config.PID[1][2] = 0.25f;
+    config.PID[0][0] = 10.0f;
+    config.PID[0][1] = 0.02f;
+    config.PID[0][2] = 0.0f;
 
     ////////////////////////
     // 添加

@@ -59,13 +59,7 @@ static void startPIDLogic_Heat(void)
     pidParm.pidCurTemp = adcGetHeatingTemp();
 
     // PID参数设定
-    if (pidParm.pidCurTemp < (pCurConfig->targetTemp - pCurConfig->PIDTemp)) {
-        // 远PID
-        MyPID.SetTunings(pCurConfig->PID[0][0], pCurConfig->PID[0][1], pCurConfig->PID[0][2]);
-    } else {
-        // 近PID
-        MyPID.SetTunings(pCurConfig->PID[1][0], pCurConfig->PID[1][1], pCurConfig->PID[1][2]);
-    }
+    MyPID.SetTunings(pCurConfig->PID[0][0], pCurConfig->PID[0][1], pCurConfig->PID[0][2]);
 
     // 得到输出目标温度
     if (TYPE_HEATING_CONSTANT == pCurConfig->type) {
@@ -102,13 +96,7 @@ static void startPIDLogic_T12(void)
     pidParm.pidCurTemp = adcGetHeatingTemp();
 
     // PID参数设定
-    if (pidParm.pidCurTemp < pCurConfig->PIDTemp) {
-        // 远PID
-        MyPID.SetTunings(pCurConfig->PID[0][0], pCurConfig->PID[0][1], pCurConfig->PID[0][2]);
-    } else {
-        // 近PID
-        MyPID.SetTunings(pCurConfig->PID[1][0], pCurConfig->PID[1][1], pCurConfig->PID[1][2]);
-    }
+    MyPID.SetTunings(pCurConfig->PID[0][0], pCurConfig->PID[0][1], pCurConfig->PID[0][2]);
 
     // 得到输出目标温度
     pidParm.pidTargetTemp = pCurConfig->targetTemp;
@@ -145,7 +133,7 @@ void TempCtrlLoop(void)
 
         // 运行后 蜂鸣器 提示音
         TickType_t time = xTaskGetTickCount();
-        if ((time - pidParm.BeppTick) >= 1000) {
+        if ((time - pidParm.BeppTick) >= 5000) {
             pidParm.BeppTick = time;
             SetSound(BeepSoundDI, false);
         }

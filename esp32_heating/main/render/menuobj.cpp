@@ -1,6 +1,7 @@
 #include "heating.h"
 #include "bitmap.h"
 #include <string.h>
+#include "argtable3/argtable3.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // 菜单相关变量
@@ -95,13 +96,9 @@ struct SlideBar SlideControls[] = {
 
     // PID参数
     { (float*)&HeatingConfig.curConfig.PIDSample, 0, 500, 1 }, // PID采样时间
-    { (float*)&HeatingConfig.curConfig.PIDTemp, 0, 500, 1 }, // PID温度切换度数
-    { (float*)&HeatingConfig.curConfig.PID[0][0], 0, 10, 0.01 }, // 比例P(爬升期)
+    { (float*)&HeatingConfig.curConfig.PID[0][0], 0, 100, 0.1 }, // 比例P(爬升期)
     { (float*)&HeatingConfig.curConfig.PID[0][1], 0, 10, 0.01 }, // I
-    { (float*)&HeatingConfig.curConfig.PID[0][2], 0, 10, 0.01 }, // D
-    { (float*)&HeatingConfig.curConfig.PID[1][0], 0, 10, 0.01 }, // 比例P(接近期)
-    { (float*)&HeatingConfig.curConfig.PID[1][1], 0, 10, 0.01 }, // I
-    { (float*)&HeatingConfig.curConfig.PID[1][2], 0, 10, 0.01 }, // D
+    { (float*)&HeatingConfig.curConfig.PID[0][2], 0, 5000, 0.1 }, // D
 
     // 卡尔曼滤波设置
     { (float*)&KalmanInfo[adc_HeatingTemp].parm.Cycle, 180, 1000, 1 }, { (float*)&KalmanInfo[adc_HeatingTemp].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_HeatingTemp].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_HeatingTemp].parm.KalmanR, 0, 10, 0.01 },
@@ -464,32 +461,16 @@ static std::vector<menuSystem> menuInfo = {
     { 212, 0, 0, 0, MenuRenderText, {
                                         { Type_MenuName, "PID参数", NULL, 201, 2, *saveCurrentHeatData },
                                         { Type_Slider, "PID采样时间", NULL, SlideComponents_PIDSample, 0, NULL },
-                                        { Type_Slider, "临近温度切换", NULL, SlideComponents_SwitchTemp, 0, NULL }, // 相差多少度开始切换
-                                        { Type_GotoMenu, "PID爬升期参数", NULL, 213, 0, NULL },
-                                        { Type_GotoMenu, "PID接近期参数", NULL, 214, 0, NULL },
-                                        { Type_ReturnMenu, "返回", NULL, 201, 2, *saveCurrentHeatData },
-                                    } },
-
-    { 213, 0, 0, 0, MenuRenderText, {
-                                        { Type_MenuName, "PID爬升期", NULL, 212, 1, *saveCurrentHeatData },
                                         { Type_Slider, "比例P", NULL, SlideComponents_PID_AP, 0, NULL },
                                         { Type_Slider, "积分I", NULL, SlideComponents_PID_AI, 0, NULL },
                                         { Type_Slider, "微分D", NULL, SlideComponents_PID_AD, 0, NULL },
-                                        { Type_ReturnMenu, "返回", NULL, 212, 1, *saveCurrentHeatData },
-                                    } },
-
-    { 214, 0, 0, 0, MenuRenderText, {
-                                        { Type_MenuName, "PID接近期", NULL, 212, 2, *saveCurrentHeatData },
-                                        { Type_Slider, "比例P", NULL, SlideComponents_PID_CP, 0, NULL },
-                                        { Type_Slider, "积分I", NULL, SlideComponents_PID_CI, 0, NULL },
-                                        { Type_Slider, "微分D", NULL, SlideComponents_PID_CD, 0, NULL },
-                                        { Type_ReturnMenu, "返回", NULL, 212, 2, *saveCurrentHeatData },
+                                        { Type_ReturnMenu, "返回", NULL, 201, 2, *saveCurrentHeatData },
                                     } },
 
     { 215, 0, 0, 0, MenuRenderText, {
                                         { Type_MenuName, "其他设置", NULL, 201, 3, *saveCurrentHeatData },
                                         { Type_GotoMenu, "模式配置", NULL, 217, 0, NULL },
-                                        { Type_Slider, "恒温温度(°C)", NULL, SlideComponents_TargetTemp, 0, NULL },
+                                        { Type_Slider, "目标温度(°C)", NULL, SlideComponents_TargetTemp, 0, NULL },
                                         { Type_ReturnMenu, "返回", NULL, 201, 3, *saveCurrentHeatData },
                                     } },
 
@@ -573,7 +554,7 @@ static int do_dumpmenu_cmd(int argc, char** argv)
     for (int i = 0; i < HeatingConfig.heatingConfig.size(); i++) {
         printf("------------------------------- 第%d个配置 -------------------------------\n", i);
         printf("配置名:%s 模式:%s\r\n", HeatingConfig.heatingConfig[i].name, heatingModeStr[HeatingConfig.heatingConfig[i].type]);
-        printf("PID %1.2f %1.2f %1.2f, %1.2f %1.2f %1.2f\r\n", HeatingConfig.heatingConfig[i].PID[0][0], HeatingConfig.heatingConfig[i].PID[0][1], HeatingConfig.heatingConfig[i].PID[0][2], HeatingConfig.heatingConfig[i].PID[1][0], HeatingConfig.heatingConfig[i].PID[1][1], HeatingConfig.heatingConfig[i].PID[1][2]);
+        printf("PID %1.2f %1.2f %1.2f\r\n", HeatingConfig.heatingConfig[i].PID[0][0], HeatingConfig.heatingConfig[i].PID[0][1], HeatingConfig.heatingConfig[i].PID[0][2]);
         printf("升温斜率 %1.1f %1.1f %1.1f %1.1f %1.1f %1.1f %1.1f\r\n", HeatingConfig.heatingConfig[i].PTemp[0], HeatingConfig.heatingConfig[i].PTemp[1], HeatingConfig.heatingConfig[i].PTemp[2], HeatingConfig.heatingConfig[i].PTemp[3], HeatingConfig.heatingConfig[i].PTemp[4], HeatingConfig.heatingConfig[i].PTemp[5], HeatingConfig.heatingConfig[i].PTemp[6]);
         if (TYPE_HEATING_VARIABLE != HeatingConfig.heatingConfig[i].type) {
             printf("恒温输出温度:%1.1f°C \n", HeatingConfig.heatingConfig[i].targetTemp);
@@ -584,6 +565,47 @@ static int do_dumpmenu_cmd(int argc, char** argv)
     for (int i = 0; i < adc_last_max; i++) {
         printf("%s卡尔曼:%s 采样周期:%1.1fms 过程噪声:%f 观测噪声:%f\n", kalmanStr[i], KalmanInfo[i].parm.UseKalman != 0 ? "开启" : "关闭", KalmanInfo[i].parm.Cycle, KalmanInfo[i].parm.KalmanQ, KalmanInfo[i].parm.KalmanR);
     }
+
+    return 0;
+}
+
+/**
+ * @brief PWM 命令结构体
+ *
+ */
+static struct {
+    struct arg_dbl* p;
+    struct arg_dbl* i;
+    struct arg_dbl* d;
+    struct arg_end* end;
+} pid_cmd_args = {};
+
+/**
+ * @brief PID 配置命令
+ *
+ * @param argc
+ * @param argv
+ * @return int
+ */
+static int do_pid_cmd(int argc, char** argv)
+{
+    int nerrors = arg_parse(argc, argv, (void**)&pid_cmd_args);
+    if (nerrors != 0) {
+        arg_print_errors(stderr, pid_cmd_args.end, argv[0]);
+        return 1;
+    }
+
+    if (pid_cmd_args.p->count > 0) {
+        HeatingConfig.curConfig.PID[0][0] = *pid_cmd_args.p->dval;
+    }
+    if (pid_cmd_args.i->count > 0) {
+        HeatingConfig.curConfig.PID[0][1] = *pid_cmd_args.i->dval;
+    }
+    if (pid_cmd_args.d->count > 0) {
+        HeatingConfig.curConfig.PID[0][2] = *pid_cmd_args.d->dval;
+    }
+
+    printf("%f %f %f\r\n", HeatingConfig.curConfig.PID[0][0], HeatingConfig.curConfig.PID[0][1], HeatingConfig.curConfig.PID[0][2]);
 
     return 0;
 }
@@ -611,6 +633,12 @@ void initMenuSystem(void)
 
     // 初始化shell命令
     register_cmd("dumpmenu", "打印出所有菜单内容", NULL, do_dumpmenu_cmd, NULL);
+
+    pid_cmd_args.p = arg_dbln("p", "", "<n>", 0, 1, "p");
+    pid_cmd_args.i = arg_dbln("i", "", "<n>", 0, 1, "i");
+    pid_cmd_args.d = arg_dbln("d", "", "<n>", 0, 1, "d");
+    pid_cmd_args.end = arg_end(20);
+    register_cmd("pid", "修改pid参数", NULL, do_pid_cmd, &pid_cmd_args);
 }
 
 /**

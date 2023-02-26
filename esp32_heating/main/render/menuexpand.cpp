@@ -156,10 +156,10 @@ void _newHeatConfig(const char* pName)
     // PID采样时间
     config.PIDSample = 100.0f;
 
-    // 爬升期 PID
+    // PID
     config.PID[0][0] = 10.0f;
-    config.PID[0][1] = 0.02f;
-    config.PID[0][2] = 0.0f;
+    config.PID[0][1] = 0.01f;
+    config.PID[0][2] = 2.0f;
 
     ////////////////////////
     // 添加

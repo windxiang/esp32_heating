@@ -64,10 +64,15 @@ struct _strADCInfo {
 static bool cali_enable = false;
 
 static _strADCInfo strADCInfo[adc_last_max] = {
+    // 采用芯片检测
     [adc_HeatingTemp] = { 0, 0, ADC1_CHANNEL_MAX, 0, ADC_ATTEN_DB_11, {} }, // 加热台K型热电偶 这一路不属于ADC范围里  是使用MAX6675芯片进行采集的
+
+    // T12 烙铁头温度 加热电流 特殊方式来检测
     [adc_T12Temp] = { 0, 0, ADC1_CHANNEL_0, 0, ADC_ATTEN_DB_11, {} }, // T12 烙铁头温度
-    [adc_T12Cur] = { 0, 0, ADC1_CHANNEL_1, 0, ADC_ATTEN_DB_11, {} }, // T12 电流
-    [adc_T12NTC] = { 0, 0, ADC1_CHANNEL_6, 0, ADC_ATTEN_DB_11, {} }, // T12 NTC
+    [adc_T12Cur] = { 0, 0, ADC1_CHANNEL_1, 0, ADC_ATTEN_DB_11, {} }, // T12 加热电流
+
+    // 可以循环读取
+    [adc_T12PCBNTC] = { 0, 0, ADC1_CHANNEL_6, 0, ADC_ATTEN_DB_11, {} }, // T12 NTC
     [adc_SystemVol] = { 0, 0, ADC1_CHANNEL_7, 0, ADC_ATTEN_DB_11, {} }, // 系统输入电压
     [adc_SystemRef] = { 0, 0, ADC1_CHANNEL_3, 0, ADC_ATTEN_DB_11, {} }, // 系统5V电压
     [adc_RoomTemp] = { 0, 0, ADC1_CHANNEL_2, 0, ADC_ATTEN_DB_11, {} }, // PCB NTC 温度
@@ -85,7 +90,7 @@ float adcGetHeatingTemp(void)
 }
 
 /**
- * @brief 获取T12烙铁头温度 运放采集
+ * @brief 获取T12烙铁头温度 运放采集 还要进行热电偶->温度 换算
  *
  * @return float
  */
@@ -113,8 +118,8 @@ float adcGetT12Cur(void)
  */
 float adcGetT12NTC(void)
 {
-    const float calibrationVal = KalmanInfo[adc_T12NTC].parm.calibrationVal;
-    const float adcVoltage = strADCInfo[adc_T12NTC].ram; // ADC 采集的电压值mV
+    const float calibrationVal = KalmanInfo[adc_T12PCBNTC].parm.calibrationVal;
+    const float adcVoltage = strADCInfo[adc_T12PCBNTC].ram; // ADC 采集的电压值mV
     const float systemVolage = adcGetSystem5VVol();
     return convertNTCTemp(adcVoltage, systemVolage) + calibrationVal;
 }
@@ -309,8 +314,8 @@ void adcProcess(int adcType, TickType_t now)
  */
 static void _processADC(void)
 {
-    // adc_T12Temp 不在这里进行处理 因为这个温度要根据PWM低电平时候才可以读取
-    for (int i = adc_T12Cur; i < adc_last_max; i++) {
+    // adc_T12Temp 和 adc_T12Cur 不在这里进行处理， 因为这2个温度要根据PWM低电平时候才可以读取
+    for (int i = adc_T12PCBNTC; i < adc_last_max; i++) {
         const _KalmanInfo* pKalmanInfo = &KalmanInfo[i]; // 获取卡尔曼周期
         const _strADCInfo* pAdcInfo = &strADCInfo[i]; // 获取ADC配置
 
@@ -383,9 +388,9 @@ static void adc_task(void* arg)
  */
 static int do_dumpadc_cmd(int argc, char** argv)
 {
-    ESP_LOGI(TAG, "加热台:%1.1f℃ 室温:%1.1f℃ 输入电压:%1.1fmV 5V电压:%1.1fmV\n", adcGetHeatingTemp(), adcGetRoomNTCTemp(), adcGetSystemVol(), adcGetSystem5VVol());
-    ESP_LOGI(TAG, "T12 NTC:%1.1f 手柄状态:%s\n", adcGetT12NTC(), t12_isPutDown() == true ? "放下" : "手上");
-    ESP_LOGI(TAG, "烙铁头温度:%1.1f 电流:%1.1f\n", adcGetT12Temp(), adcGetT12Cur());
+    ESP_LOGI(TAG, "加热台:%1.1f 室温:%1.1f 输入电压:%1.1fmV 5V电压:%1.1fmV\n", adcGetHeatingTemp(), adcGetRoomNTCTemp(), adcGetSystemVol(), adcGetSystem5VVol());
+    ESP_LOGI(TAG, "T12 PCB温度:%1.1f 手柄状态:%s\n", adcGetT12NTC(), t12_isPutDown() == true ? "放下" : "手上");
+    ESP_LOGI(TAG, "烙铁头温度:%1.1f 加热电流:%1.1f\n", adcGetT12Temp(), adcGetT12Cur());
     return 0;
 }
 

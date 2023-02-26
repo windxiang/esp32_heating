@@ -107,9 +107,9 @@
 // ADC类型定义
 enum _enumADCTYPE {
     adc_HeatingTemp = 0, // 加热台温度 SPI读取芯片
-    adc_T12Temp, // T12 烙铁头温度
-    adc_T12Cur, // T12 电流
-    adc_T12NTC, // T12 NTC温度
+    adc_T12Temp, // T12 烙铁头温度 在T12 IO 输出低电平时候采集温度
+    adc_T12Cur, // T12 烙铁电流 在T12 IO 输出高电平时候采集电流
+    adc_T12PCBNTC, // T12 NTC温度
     adc_SystemVol, // 系统输入电压
     adc_SystemRef, // 系统5V电压
     adc_RoomTemp, // PCB温度

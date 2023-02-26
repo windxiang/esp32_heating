@@ -1,7 +1,14 @@
+/*
+2. 在使用模拟IO的方式来测试
+    2.测试占空比 是否正确
+3.T12 插入 拔出的检测
+3.停止加热后 要多久时间ADC采集才正确 电烙铁温度
+4.开始加热后 要多久时间ADC采集才正确 电流
+*/
 #include "heating.h"
 #include "argtable3/argtable3.h"
 
-#define PERIOD_HZ (100) // 周期时间100ms  10Hz
+#define PERIOD_HZ (100) // 周期时间100ms  10Hz 刚好选择占空比范围为0~100
 
 /**
  * @brief PWM 命令结构体
@@ -16,22 +23,20 @@ static struct {
 enum _T12Status {
     _T12_INIT = 0, // T12 初始化阶段
     _T12_START, // T12开始输出
-    _T12_STOP, // T12 停止输出
 };
 
 struct _strT12Info {
     QueueHandle_t queue;
     _T12Status status;
     TickType_t tickStart; // 开始输出时间
-    uint8_t lastDutyCycle; // 上一个占空比
+    uint8_t CurDutyCycle; // 本次输出占空比
     uint8_t nextDutyCycle; // 下一个占空比
-    TickType_t adcTick; // ADC采集时间
 };
 
 static _strT12Info t12Info = {};
 
 /**
- * @brief T12手柄是否插入
+ * @brief T12手柄是否插入 TODO
  *
  * @return true 插入
  * @return false 未插入
@@ -76,7 +81,7 @@ static bool getT12PWMLevel(void)
 /**
  * @brief 设置 T12 PWM 输出
  *
- * @param dutyCycle
+ * @param dutyCycle 输出周期 百分比 （0~100）
  * @return true
  * @return false
  */
@@ -102,57 +107,44 @@ static bool T12OutputStateMachine(uint8_t dutyCycle)
         dutyCycle = 100;
     }
 
-    TickType_t now = xTaskGetTickCount();
-
-    // 测量T12温度
-    if (false == getT12PWMLevel()) {
-        // if ((t12Info.adcTick + 1) <= now) {
-        if (dutyCycle == 0) {
-            // delay(10);
-            // adcProcess(adc_T12Temp, now);
-        }
-    }
-
+    // 状态机
     switch (t12Info.status) {
     case _T12_INIT: {
         if (0 < dutyCycle) {
             // 开始输出
+            t12Info.tickStart = xTaskGetTickCount();
+            t12Info.CurDutyCycle = dutyCycle;
             setT12IOLevel(1);
             t12Info.status = _T12_START;
-            t12Info.tickStart = xTaskGetTickCount();
-            t12Info.lastDutyCycle = dutyCycle;
-            t12Info.adcTick = 0;
 
         } else {
             // 等待开始
-            t12Info.lastDutyCycle = 0;
+            t12Info.CurDutyCycle = 0;
             t12Info.status = _T12_INIT;
             setT12IOLevel(0);
-            if (t12Info.adcTick == 0) {
-                t12Info.adcTick = now;
-            }
         }
     } break;
 
     case _T12_START: {
         // 已经开始输出状态下
-        TickType_t targetTick = t12Info.tickStart + t12Info.lastDutyCycle; // 高电平时间
+        TickType_t targetTick = t12Info.tickStart + t12Info.CurDutyCycle; // 高电平时间
+        TickType_t now = xTaskGetTickCount();
 
         if (targetTick > now) {
             setT12IOLevel(1);
-            t12Info.adcTick = 0;
 
         } else {
             setT12IOLevel(0);
-            t12Info.adcTick = now;
+            delay(1);
+            adcProcess(adc_T12Temp, now);
         }
 
-        // 输出完一个周期
         if ((PERIOD_HZ + t12Info.tickStart) <= now) {
+            // 输出完一个周期 切换到下一个周期进行输出
             t12Info.status = _T12_INIT;
-            t12Info.lastDutyCycle = t12Info.nextDutyCycle;
-            delay(10);
-            adcProcess(adc_T12Temp, now);
+            t12Info.CurDutyCycle = t12Info.nextDutyCycle;
+            // delay(1);
+            // adcProcess(adc_T12Temp, now);
         }
     } break;
 
@@ -202,11 +194,11 @@ static void t12pwm_task(void* arg)
             // 得到新的占空比
             t12Info.nextDutyCycle = q;
             if (t12Info.status == _T12_INIT) {
-                t12Info.lastDutyCycle = t12Info.nextDutyCycle;
+                t12Info.CurDutyCycle = t12Info.nextDutyCycle;
             }
         }
 
-        T12OutputStateMachine(t12Info.lastDutyCycle);
+        T12OutputStateMachine(t12Info.CurDutyCycle);
     }
 }
 
@@ -229,16 +221,16 @@ void t12Init(void)
     gpio_config(&io_conf);
 
     // PWM IO
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = BIT64(PIN_PWM_T12);
-    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-    io_conf.intr_type = GPIO_INTR_DISABLE;
-    gpio_config(&io_conf);
+    // io_conf.mode = GPIO_MODE_OUTPUT;
+    // io_conf.pin_bit_mask = BIT64(PIN_PWM_T12);
+    // io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    // io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    // io_conf.intr_type = GPIO_INTR_DISABLE;
+    // gpio_config(&io_conf);
 
-    setT12IOLevel(0);
+    // setT12IOLevel(0);
 
-    xTaskCreatePinnedToCore(t12pwm_task, "t12pwm", 1024 * 5, NULL, 5, NULL, tskNO_AFFINITY);
+    // xTaskCreatePinnedToCore(t12pwm_task, "t12pwm", 1024 * 5, NULL, 5, NULL, tskNO_AFFINITY);
 
     // 测试命令
     t12pwm_cmd_args.val = arg_intn("v", "val", "<n>", 1, 1, "t12 output value");

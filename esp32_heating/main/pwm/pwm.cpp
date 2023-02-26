@@ -7,6 +7,7 @@
 #define DUTYRESOLUTION2 LEDC_TIMER_14_BIT
 
 static const ledc_timer_config_t pwmTimer[] = {
+    // 修改占空比
     {
         .speed_mode = LEDC_HIGH_SPEED_MODE, // timer mode
         .duty_resolution = DUTYRESOLUTION1, // resolution of PWM duty

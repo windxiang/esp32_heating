@@ -63,7 +63,7 @@ uint8_t* SwitchControls[] = {
     (uint8_t*)&KalmanInfo[adc_HeatingTemp].parm.UseKalman, // 卡尔曼滤波开关
     (uint8_t*)&KalmanInfo[adc_T12Temp].parm.UseKalman, // 卡尔曼滤波开关
     (uint8_t*)&KalmanInfo[adc_T12Cur].parm.UseKalman, // 卡尔曼滤波开关
-    (uint8_t*)&KalmanInfo[adc_T12NTC].parm.UseKalman, // 卡尔曼滤波开关
+    (uint8_t*)&KalmanInfo[adc_T12PCBNTC].parm.UseKalman, // 卡尔曼滤波开关
     (uint8_t*)&KalmanInfo[adc_SystemVol].parm.UseKalman, // 卡尔曼滤波开关
     (uint8_t*)&KalmanInfo[adc_SystemRef].parm.UseKalman, // 卡尔曼滤波开关
     (uint8_t*)&KalmanInfo[adc_RoomTemp].parm.UseKalman, // 卡尔曼滤波开关
@@ -104,7 +104,7 @@ struct SlideBar SlideControls[] = {
     { (float*)&KalmanInfo[adc_HeatingTemp].parm.Cycle, 180, 1000, 1 }, { (float*)&KalmanInfo[adc_HeatingTemp].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_HeatingTemp].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_HeatingTemp].parm.KalmanR, 0, 10, 0.01 },
     { (float*)&KalmanInfo[adc_T12Temp].parm.Cycle, 10, 1000, 1 }, { (float*)&KalmanInfo[adc_T12Temp].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_T12Temp].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_T12Temp].parm.KalmanR, 0, 10, 0.01 },
     { (float*)&KalmanInfo[adc_T12Cur].parm.Cycle, 10, 1000, 1 }, { (float*)&KalmanInfo[adc_T12Cur].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_T12Cur].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_T12Cur].parm.KalmanR, 0, 10, 0.01 },
-    { (float*)&KalmanInfo[adc_T12NTC].parm.Cycle, 10, 1000, 1 }, { (float*)&KalmanInfo[adc_T12NTC].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_T12NTC].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_T12NTC].parm.KalmanR, 0, 10, 0.01 },
+    { (float*)&KalmanInfo[adc_T12PCBNTC].parm.Cycle, 10, 1000, 1 }, { (float*)&KalmanInfo[adc_T12PCBNTC].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_T12PCBNTC].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_T12PCBNTC].parm.KalmanR, 0, 10, 0.01 },
     { (float*)&KalmanInfo[adc_SystemVol].parm.Cycle, 10, 1000, 1 }, { (float*)&KalmanInfo[adc_SystemVol].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_SystemVol].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_SystemVol].parm.KalmanR, 0, 10, 0.01 },
     { (float*)&KalmanInfo[adc_SystemRef].parm.Cycle, 10, 1000, 1 }, { (float*)&KalmanInfo[adc_SystemRef].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_SystemRef].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_SystemRef].parm.KalmanR, 0, 10, 0.01 },
     { (float*)&KalmanInfo[adc_RoomTemp].parm.Cycle, 10, 1000, 1 }, { (float*)&KalmanInfo[adc_RoomTemp].parm.calibrationVal, 0, 100, 1 }, { (float*)&KalmanInfo[adc_RoomTemp].parm.KalmanQ, 0, 10, 0.01 }, { (float*)&KalmanInfo[adc_RoomTemp].parm.KalmanR, 0, 10, 0.01 },

@@ -51,7 +51,7 @@ _KalmanInfo KalmanInfo[adc_last_max] = {
         .parm = { 1, 100, 0, 0.1f, 0.1f },
     },
     // T12 NTC
-    [adc_T12NTC] = {
+    [adc_T12PCBNTC] = {
         .filter = { 0.02, 0, 0, 0 },
         .parm = { 1, 100, 0, 0.1f, 0.1f },
     },

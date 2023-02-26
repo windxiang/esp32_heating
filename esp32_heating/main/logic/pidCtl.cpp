@@ -93,7 +93,7 @@ static void startPIDLogic_T12(void)
     const _HeatingConfig* pCurConfig = getCurrentHeatingConfig();
 
     // 当前温度
-    pidParm.pidCurTemp = adcGetHeatingTemp();
+    pidParm.pidCurTemp = adcGetT12Temp();
 
     // PID参数设定
     MyPID.SetTunings(pCurConfig->PID[0][0], pCurConfig->PID[0][1], pCurConfig->PID[0][2]);
@@ -109,7 +109,7 @@ static void startPIDLogic_T12(void)
         // 输出
         t12PWMOutput((uint8_t)pidParm.pidCurOutput);
 
-        // ESP_LOGI(TAG, "%1.1f/%1.1f 输出:%1.1f PID:%1.1f %1.1f %1.1f\n", pidParm.pidCurTemp, pidParm.pidTargetTemp, pidParm.pidCurOutput, MyPID.GetKp(), MyPID.GetKi(), MyPID.GetKd());
+        printf("3:%1.1f,%1.0f,%1.0f\n", pidParm.pidCurTemp, pidParm.pidTargetTemp, pidParm.pidCurOutput);
     }
 }
 
